@@ -1,0 +1,13 @@
+# Credenciales
+.env
+
+# Datos crudos (se descargan con src/descargar_datos.py)
+data/raw/*
+!data/raw/.gitkeep
+*.tmp
+
+# Python / Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/

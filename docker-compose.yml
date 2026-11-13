@@ -1,0 +1,57 @@
+# Pipeline de quejas financieras: procesamiento (Jupyter), MongoDB y app (Streamlit).
+# Uso:  cp .env.example .env   &&   docker compose up --build
+name: quejas-financieras
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: quejas-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongo_datos:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  procesamiento:
+    build:
+      context: .
+      dockerfile: processing/Dockerfile
+    container_name: quejas-procesamiento
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+    volumes:
+      - ./:/proyecto            # código, notebook, data/, models/ y reports/ compartidos con el host
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    mem_limit: 4g
+
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: quejas-app
+    env_file: .env
+    environment:
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    volumes:
+      - ./:/proyecto:ro         # la app solo lee resultados (Parquet, modelo, PDF)
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  mongo_datos:

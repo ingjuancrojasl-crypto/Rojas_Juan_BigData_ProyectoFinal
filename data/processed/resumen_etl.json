@@ -1,0 +1,241 @@
+{
+  "filas_crudas": 1400425,
+  "columnas_crudas": 10,
+  "filas_finales": 1400348,
+  "columnas_finales": 25,
+  "registros_eliminados": 0,
+  "registros_consolidados": 77,
+  "total_quejas": 10041272,
+  "problemas_detectados": [
+    {
+      "categoria": "Nombres de columna",
+      "problema": "Mayúsculas, tildes y 'ñ' en encabezados; archivo con BOM",
+      "registros_afectados": 10,
+      "tratamiento": "Limpieza: renombrar a snake_case y leer con utf-8-sig"
+    },
+    {
+      "categoria": "Nulos",
+      "problema": "Registros sin departamento ni municipio",
+      "registros_afectados": 5157,
+      "tratamiento": "Limpieza: imputar 'SIN INFORMACIÓN' (no se eliminan: 44 % escaló a la SFC)"
+    },
+    {
+      "categoria": "Inconsistencia de texto",
+      "problema": "Motivos repetidos que solo cambian en mayúsculas, tildes o puntuación",
+      "registros_afectados": 7,
+      "tratamiento": "Normalización: clave sin tildes y etiqueta canónica más frecuente"
+    },
+    {
+      "categoria": "Catálogo mixto",
+      "problema": "Filas con motivos de un catálogo distinto escrito en MAYÚSCULAS sostenidas",
+      "registros_afectados": 1490,
+      "tratamiento": "Normalización: unificar a la etiqueta canónica"
+    },
+    {
+      "categoria": "Llave ambigua",
+      "problema": "Códigos de entidad que se repiten en varios tipos de entidad",
+      "registros_afectados": 49,
+      "tratamiento": "Enriquecimiento: llave compuesta id_entidad = tipo-código"
+    },
+    {
+      "categoria": "Llave ambigua",
+      "problema": "Nombres de municipio que existen en más de un departamento",
+      "registros_afectados": 67,
+      "tratamiento": "Enriquecimiento: llave compuesta departamento|municipio"
+    },
+    {
+      "categoria": "Códigos sin descripción",
+      "problema": "Tipos de entidad solo como número",
+      "registros_afectados": 23,
+      "tratamiento": "Enriquecimiento: cruce con catálogo de tipos de entidad SFC"
+    },
+    {
+      "categoria": "Distribución sesgada",
+      "problema": "Cantidad de quejas > p99 (69); máximo 37,366",
+      "registros_afectados": 13849,
+      "tratamiento": "Normalización: log1p y bandera de volumen atípico (no se eliminan, son reales)"
+    },
+    {
+      "categoria": "Meses faltantes",
+      "problema": "Meses sin ningún registro: 2026-02",
+      "registros_afectados": 1,
+      "tratamiento": "Análisis: no interpolar; comparar años con promedios mensuales"
+    },
+    {
+      "categoria": "Meses con carga parcial",
+      "problema": "Meses con < 20 % del volumen mediano: 2026-09",
+      "registros_afectados": 2467,
+      "tratamiento": "Limpieza: bandera mes_incompleto; se excluyen de series y del modelo"
+    },
+    {
+      "categoria": "Valores inválidos",
+      "problema": "Mes fuera de 1-12 o cantidad ≤ 0",
+      "registros_afectados": 0,
+      "tratamiento": "Limpieza: regla de validación (se eliminarían si aparecen)"
+    },
+    {
+      "categoria": "Duplicados exactos",
+      "problema": "Filas idénticas en todas las columnas",
+      "registros_afectados": 0,
+      "tratamiento": "Limpieza: eliminar duplicados exactos"
+    },
+    {
+      "categoria": "Tipos ineficientes",
+      "problema": "Textos como object y enteros de 64 bits",
+      "registros_afectados": 279,
+      "tratamiento": "Normalización: category + enteros pequeños (valor = MB en memoria)"
+    }
+  ],
+  "pasos_etl": [
+    {
+      "etapa": "Renombrar columnas",
+      "tecnica": "Limpieza",
+      "antes": 10,
+      "despues": 10,
+      "diferencia": 0,
+      "detalle": "Encabezados a snake_case sin tildes ni 'ñ'"
+    },
+    {
+      "etapa": "Imputar ubicación faltante",
+      "tecnica": "Limpieza",
+      "antes": 5157,
+      "despues": 0,
+      "diferencia": -5157,
+      "detalle": "Nulos -> 'SIN INFORMACIÓN' + bandera sin_ubicacion"
+    },
+    {
+      "etapa": "Eliminar valores inválidos",
+      "tecnica": "Limpieza",
+      "antes": 1400425,
+      "despues": 1400425,
+      "diferencia": 0,
+      "detalle": "Mes en 1-12, año plausible y cantidad > 0"
+    },
+    {
+      "etapa": "Eliminar duplicados exactos",
+      "tecnica": "Limpieza",
+      "antes": 1400425,
+      "despues": 1400425,
+      "diferencia": 0,
+      "detalle": "Filas idénticas en todas las columnas"
+    },
+    {
+      "etapa": "Marcar meses con carga parcial",
+      "tecnica": "Limpieza",
+      "antes": 0,
+      "despues": 2467,
+      "diferencia": 2467,
+      "detalle": "Filas en meses incompletos (2026-09); se conservan con bandera"
+    },
+    {
+      "etapa": "Total limpieza (filas)",
+      "tecnica": "Limpieza",
+      "antes": 1400425,
+      "despues": 1400425,
+      "diferencia": 0,
+      "detalle": ""
+    },
+    {
+      "etapa": "Unificar escritura de motivo",
+      "tecnica": "Normalización",
+      "antes": 316,
+      "despues": 307,
+      "diferencia": -9,
+      "detalle": "Valores únicos antes/después (tildes, mayúsculas, puntuación)"
+    },
+    {
+      "etapa": "Unificar escritura de producto",
+      "tecnica": "Normalización",
+      "antes": 90,
+      "despues": 90,
+      "diferencia": 0,
+      "detalle": "Valores únicos antes/después (tildes, mayúsculas, puntuación)"
+    },
+    {
+      "etapa": "Unificar escritura de municipio",
+      "tecnica": "Normalización",
+      "antes": 1037,
+      "despues": 1037,
+      "diferencia": 0,
+      "detalle": "Valores únicos antes/después (tildes, mayúsculas, puntuación)"
+    },
+    {
+      "etapa": "Unificar escritura de instancia_recepcion",
+      "tecnica": "Normalización",
+      "antes": 4,
+      "despues": 4,
+      "diferencia": 0,
+      "detalle": "Valores únicos antes/después (tildes, mayúsculas, puntuación)"
+    },
+    {
+      "etapa": "Corregir tildes en producto",
+      "tecnica": "Normalización",
+      "antes": 95455,
+      "despues": 0,
+      "diferencia": -95455,
+      "detalle": "Filas con 'Creditos' sin tilde antes/después"
+    },
+    {
+      "etapa": "Escala log y bandera de atípicos",
+      "tecnica": "Normalización",
+      "antes": 0,
+      "despues": 13849,
+      "diferencia": 13849,
+      "detalle": "log1p(cantidad); atípico si cantidad > p99 = 69"
+    },
+    {
+      "etapa": "Optimizar tipos (MB en memoria)",
+      "tecnica": "Normalización",
+      "antes": 282,
+      "despues": 35,
+      "diferencia": -247,
+      "detalle": "category para textos y enteros de 8/16/32 bits"
+    },
+    {
+      "etapa": "Consolidar registros equivalentes",
+      "tecnica": "Agregación",
+      "antes": 1400425,
+      "despues": 1400348,
+      "diferencia": -77,
+      "detalle": "Filas con las mismas 9 dimensiones tras normalizar"
+    },
+    {
+      "etapa": "Control: total de quejas",
+      "tecnica": "Agregación",
+      "antes": 10041272,
+      "despues": 10041272,
+      "diferencia": 0,
+      "detalle": "Debe ser igual: la consolidación no pierde quejas"
+    },
+    {
+      "etapa": "Cruce con catálogo de tipos de entidad",
+      "tecnica": "Enriquecimiento",
+      "antes": 1400348,
+      "despues": 1400348,
+      "diferencia": 0,
+      "detalle": "Filas con nombre y sector de entidad"
+    },
+    {
+      "etapa": "Cruce con regiones naturales (DANE)",
+      "tecnica": "Enriquecimiento",
+      "antes": 1400348,
+      "despues": 1395191,
+      "diferencia": -5157,
+      "detalle": "Filas con región asignada (el resto no tiene ubicación)"
+    },
+    {
+      "etapa": "Columnas agregadas",
+      "tecnica": "Enriquecimiento",
+      "antes": 14,
+      "despues": 25,
+      "diferencia": 11,
+      "detalle": "nombre/sector de entidad, región, DANE, llaves, periodo, trimestre, categoría de motivo y variable objetivo 'escalada'"
+    }
+  ],
+  "agregaciones": {
+    "cubo_anio_region_departamento_producto": 7019,
+    "cubo_anio_sector_instancia_categoria": 935,
+    "serie_mensual_sector": 301,
+    "ranking_entidades": 216
+  }
+}

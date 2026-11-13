@@ -1,0 +1,24 @@
+codigo_tipo_entidad,nombre_tipo_entidad,sector,fuente_nombre
+1,Establecimientos bancarios,Bancario y crédito,Catálogo SFC
+2,Corporaciones financieras,Bancario y crédito,Catálogo SFC
+4,Compañías de financiamiento,Bancario y crédito,Catálogo SFC
+5,Sociedades fiduciarias,Fiduciario,Catálogo SFC
+6,Almacenes generales de depósito,Otros servicios financieros,Catálogo SFC
+10,Sociedades de capitalización y otras aseguradoras,Seguros,Inferido por productos
+11,Aseguradoras / intermediarios de seguros,Seguros,Inferido por productos
+13,Compañías de seguros generales,Seguros,Inferido por productos
+14,Compañías de seguros de vida,Seguros,Inferido por productos
+15,Cooperativas de seguros,Seguros,Inferido por productos
+22,Instituciones oficiales especiales,Bancario y crédito,Catálogo SFC
+23,Sociedades administradoras de fondos de pensiones y cesantías,Pensiones y cesantías,Catálogo SFC
+25,Régimen de prima media (pensiones públicas),Pensiones y cesantías,Inferido por productos
+32,Cooperativas de carácter financiero,Bancario y crédito,Inferido por productos
+82,Bolsas de valores,Mercado de valores,Catálogo SFC
+85,Sociedades comisionistas de bolsa de valores,Mercado de valores,Catálogo SFC
+87,Sociedades administradoras de inversión,Mercado de valores,Catálogo SFC
+118,Sociedades especializadas en depósitos y pagos electrónicos (SEDPE),Pagos digitales,Inferido por productos
+127,Operadores de información PILA,Otros servicios financieros,Inferido por productos
+128,Entidades de depósitos de bajo monto y pagos,Pagos digitales,Inferido por productos
+129,Otras entidades de crédito y valores,Mercado de valores,Inferido por productos
+142,Otras entidades de seguros y pensiones voluntarias,Seguros,Inferido por productos
+401,Comisionistas de bolsa agropecuaria y otros intermediarios,Mercado de valores,Inferido por productos
