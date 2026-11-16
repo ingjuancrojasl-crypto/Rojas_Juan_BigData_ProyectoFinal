@@ -28,18 +28,18 @@ Tras filtrar tránsito y el periodo común **2015-2024**: **767.313 registros**,
 
 ```
                  ┌─────────────────────────────── red interna de Docker ───────────────────────────────┐
-  datos.gov.co ─►│  procesamiento (Jupyter + pandas)  ──insights──►  mongodb (mongo:7.0)               │
-  (o respaldo    │      │  descarga → ETL → modelo → PDF                    ▲                           │
-   en GitHub)    │      ▼                                                    │ lee insights              │
+  GitHub (.zip) ►│  procesamiento (Jupyter + pandas)  ──insights──►  mongodb (mongo:7.0)               │
+  (o datos.gov.co│      │  descarga → ETL → modelo → PDF                    ▲                           │
+   como respaldo)│      ▼                                                    │ lee insights              │
                  │  volumen ./data  ./models  ./reports  ───── lee ────►  app (Streamlit)               │
                  └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **procesamiento:** descarga las 4 fuentes, ejecuta el ETL y deja Jupyter Lab listo para correr el notebook.
+- **procesamiento:** descarga las 4 fuentes desde los .zip del repositorio en GitHub (con datos.gov.co como respaldo), ejecuta el ETL y deja Jupyter Lab listo para correr el notebook.
 - **mongodb:** almacena el documento de análisis (metadata, calidad, estadísticas, modelo, insights, recomendaciones). Persistencia en el volumen `mongo_datos`.
 - **app:** dashboard Streamlit que **solo lee** resultados ya procesados (Parquet, modelo, MongoDB y PDF).
 
-**Decisión pandas vs. Spark:** **pandas**. Los 4 CSV ocupan ~640 MB en memoria como texto y ~43 MB con tipos `category` (−93 %); se leen en ~5 s y el ETL completo tarda ~1 minuto con un pico de ~2,2 GB de RAM. Mediciones en la sección 2 del notebook.
+**Decisión pandas vs. Spark:** **pandas**. Los 4 CSV ocupan ~640 MB en memoria como texto y ~43 MB con tipos `category` (−93 %); se leen en ~5 s y el ETL completo tarda ~20 segundos con un pico de ~2,2 GB de RAM. Mediciones en la sección 2 del notebook.
 
 ## 3. Estructura del repositorio
 
@@ -56,9 +56,9 @@ Rojas_Juan_BigData_ProyectoFinal/
 │   └── Rojas_Juan_BigData_ProyectoFinal.ipynb
 ├── src/
 │   ├── config.py             # Rutas relativas, fuentes y parámetros
-│   ├── descargar_datos.py    # Descarga de las 4 fuentes (oficial con respaldo en GitHub)
+│   ├── descargar_datos.py    # Descarga de las 4 fuentes (GitHub, con datos.gov.co como respaldo)
 │   └── etl.py                # Diagnóstico de calidad, unificación y 4 técnicas ETL
-├── respaldo_datos/           # CSV originales comprimidos (respaldo de descarga)
+├── *.zip                     # 4 CSV originales comprimidos (fuente de descarga del proyecto)
 ├── processing/               # Dockerfile y requirements del servicio Jupyter
 ├── models/                   # Modelo entrenado
 ├── reports/                  # Reporte PDF generado
@@ -71,7 +71,7 @@ Rojas_Juan_BigData_ProyectoFinal/
 
 - Docker Desktop (o Docker Engine) con **Docker Compose v2**.
 - ~4 GB de RAM libres para el contenedor de procesamiento y ~2 GB de disco.
-- Conexión a internet la primera vez (imágenes y ~490 MB de datos).
+- Conexión a internet la primera vez (imágenes de Docker y ~26 MB de datos comprimidos).
 
 ## 5. Cómo ejecutar
 
@@ -84,7 +84,7 @@ docker compose up --build
 
 ### Orden de ejecución
 1. **mongodb** arranca y espera a estar sano (`healthcheck` con `ping`).
-2. **procesamiento** descarga las 4 fuentes a `data/raw/` (si faltan), ejecuta el ETL (si no existen los Parquet) y abre Jupyter Lab.
+2. **procesamiento** descarga las 4 fuentes desde GitHub a `data/raw/` (si faltan), ejecuta el ETL (si no existen los Parquet) y abre Jupyter Lab.
 3. **app** arranca Streamlit y lee los resultados.
 
 ### Puertos
@@ -114,16 +114,21 @@ python src/etl.py
 ### 6.1 La descarga oficial falla o llega incompleta
 - **Síntoma:** `src/descargar_datos.py` mostró `falló (Tunnel connection failed: 403 Forbidden)` en un entorno con salida a internet restringida por proxy. Además, la URL `.../resource/<id>.csv` devuelve solo **1.000 filas** (límite por defecto de la API Socrata), sin ningún error visible.
 - **Diagnóstico:** la URL abría en el navegador (el dataset seguía publicado) pero `curl` desde el mismo entorno devolvía `CONNECT tunnel failed, response 403`: el bloqueo estaba en el proxy de red.
-- **Solución:** el script usa la descarga completa (`/api/views/<id>/rows.csv?accessType=DOWNLOAD`), valida un mínimo de filas por fuente y, si falla, usa el respaldo comprimido de `respaldo_datos/` en GitHub. La fuente usada queda en `data/raw/metadata_descarga.json`.
+- **Solución:** los 4 CSV originales se publicaron comprimidos en la raíz del repositorio y el script los descarga desde GitHub como fuente principal (~26 MB). Si GitHub falla, usa la descarga completa oficial (`/api/views/<id>/rows.csv?accessType=DOWNLOAD`, no la vista limitada a 1.000 filas). En ambos casos valida un mínimo de filas por fuente y registra la fuente usada en `data/raw/metadata_descarga.json`.
 
 ### 6.2 `entrypoint.sh` falla en Windows por finales de línea CRLF
 - **Síntoma:** al clonar en Windows, el contenedor de procesamiento puede terminar con `/bin/sh^M: bad interpreter`.
 - **Diagnóstico:** Git en Windows convierte `LF` → `CRLF`; el `\r` final impide que Linux reconozca el intérprete.
 - **Solución:** `.gitattributes` fuerza `*.sh text eol=lf`.
 
-### 6.3 Límite de 25 MB por archivo en la carga web de GitHub
+### 6.3 El script de descarga se detiene en Windows sin mostrar el motivo
+- **Síntoma:** en el notebook, `subprocess.run(...descargar_datos.py)` terminaba con `CalledProcessError` y sin mensaje útil.
+- **Diagnóstico:** el error real ocurría en el proceso hijo: la consola de Windows usa la codificación cp1252 y no puede imprimir caracteres como `✓` o `→` (`UnicodeEncodeError`). Además, los respaldos estaban en la raíz del repositorio y no en la carpeta que esperaba el script.
+- **Solución:** el script reconfigura su salida a UTF-8, el notebook llama a `descargar_datos.descargar_todo()` en el mismo proceso (los errores se ven completos en la celda) y la URL de respaldo apunta a la raíz del repositorio.
+
+### 6.4 Límite de 25 MB por archivo en la carga web de GitHub
 - **Síntoma:** los CSV originales (hasta 238 MB) no se pueden subir al repositorio.
-- **Solución:** cada fuente se comprime por separado en `respaldo_datos/` (entre 0,9 y 12 MB cada una) y `data/raw/` queda fuera del control de versiones (`.gitignore`).
+- **Solución:** cada fuente se comprime por separado en un .zip en la raíz del repositorio (entre 0,9 y 12 MB cada uno) y `data/raw/` queda fuera del control de versiones (`.gitignore`).
 
 ## 7. Estado del proyecto
 
