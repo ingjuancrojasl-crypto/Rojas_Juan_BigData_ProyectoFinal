@@ -1,0 +1,13 @@
+pandas==3.0.5
+numpy>=2.1
+pyarrow>=18.0
+psutil>=6.0
+scikit-learn==1.9.1
+joblib>=1.4
+matplotlib>=3.9
+seaborn>=0.13
+pymongo>=4.10
+reportlab>=4.2
+jupyterlab>=4.3
+nbconvert>=7.16
+ipykernel>=6.29

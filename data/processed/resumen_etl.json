@@ -1,0 +1,456 @@
+{
+  "fuentes": [
+    {
+      "fuente": "inml_lesiones",
+      "entidad": "Instituto Nacional de Medicina Legal y Ciencias Forenses (INMLCF)",
+      "id_datos_gov": "ezhf-hscf",
+      "filas": 342796,
+      "columnas": 39,
+      "disco_mb": 238.4,
+      "memoria_mb": 305.3,
+      "periodo": "2015-2024"
+    },
+    {
+      "fuente": "inml_muertes",
+      "entidad": "Instituto Nacional de Medicina Legal y Ciencias Forenses (INMLCF)",
+      "id_datos_gov": "s65h-7665",
+      "filas": 73403,
+      "columnas": 38,
+      "disco_mb": 47.5,
+      "memoria_mb": 61.5,
+      "periodo": "2015-2024"
+    },
+    {
+      "fuente": "policia_lesiones",
+      "entidad": "Dirección General de la Policía Nacional (DIPON)",
+      "id_datos_gov": "72sg-cybi",
+      "filas": 1381416,
+      "columnas": 9,
+      "disco_mb": 191.1,
+      "memoria_mb": 253.6,
+      "periodo": "2010-2026"
+    },
+    {
+      "fuente": "policia_homicidios_transito",
+      "entidad": "Dirección General de la Policía Nacional (DIPON)",
+      "id_datos_gov": "ha6j-pa2r",
+      "filas": 98430,
+      "columnas": 9,
+      "disco_mb": 14.8,
+      "memoria_mb": 19.3,
+      "periodo": "2010-2026"
+    }
+  ],
+  "filas_crudas": 1896045,
+  "filas_unificadas": 960623,
+  "filas_medicina_legal": 415933,
+  "filas_policia_victimas": 544690,
+  "problemas_detectados": [
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Esquema",
+      "problema": "Columnas equivalentes con nombre distinto entre lesiones y muertes",
+      "registros_afectados": 5,
+      "tratamiento": "Normalización: renombrar a un esquema común en snake_case"
+    },
+    {
+      "fuente": "Policía lesiones",
+      "categoria": "Alcance",
+      "problema": "Filas que NO son de tránsito (lesiones personales, riñas, etc.)",
+      "registros_afectados": 926057,
+      "tratamiento": "Limpieza: filtrar conducta 'EN ACCIDENTE DE TRANSITO'"
+    },
+    {
+      "fuente": "Policía",
+      "categoria": "Alcance",
+      "problema": "Filas fuera del periodo común 2015-2024",
+      "registros_afectados": 514111,
+      "tratamiento": "Limpieza: filtrar al periodo común de las 4 fuentes"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Duplicados",
+      "problema": "Filas idénticas en las 38-39 columnas (sin contar el ID)",
+      "registros_afectados": 266,
+      "tratamiento": "Limpieza: eliminar (con tantas variables, coincidir en todo es un registro repetido)"
+    },
+    {
+      "fuente": "Policía homicidios",
+      "categoria": "Duplicados aparentes",
+      "problema": "Filas idénticas en las 9 columnas (2010-2026)",
+      "registros_afectados": 10959,
+      "tratamiento": "Se conservan: con solo 9 variables, dos víctimas distintas del mismo día y municipio se ven iguales"
+    },
+    {
+      "fuente": "Policía lesiones",
+      "categoria": "Granularidad",
+      "problema": "Filas de tránsito que agrupan varias víctimas (CANTIDAD > 1, hasta 60)",
+      "registros_afectados": 153360,
+      "tratamiento": "Normalización: expandir a una fila por víctima"
+    },
+    {
+      "fuente": "Policía",
+      "categoria": "Valores incoherentes",
+      "problema": "Medio = escopolamina, arma blanca, arma de fuego o contundente en un accidente de tránsito",
+      "registros_afectados": 1231,
+      "tratamiento": "Limpieza: medio -> 'Sin información' y bandera"
+    },
+    {
+      "fuente": "Policía",
+      "categoria": "Nulos",
+      "problema": "Registros sin género (vacío o 'NO REPORTA')",
+      "registros_afectados": 2459,
+      "tratamiento": "Limpieza: 'Sin información'"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Registro desigual",
+      "problema": "Sin dato de hora del hecho: 6 % en lesiones vs 50 % en muertes",
+      "registros_afectados": 57626,
+      "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Registro desigual",
+      "problema": "Sin dato de causa (circunstancia): 10 % en lesiones vs 66 % en muertes",
+      "registros_afectados": 81482,
+      "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Registro desigual",
+      "problema": "Sin dato de actividad durante el hecho: 1 % en lesiones vs 33 % en muertes",
+      "registros_afectados": 26444,
+      "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Registro desigual",
+      "problema": "Sin dato de escolaridad: 2 % en lesiones vs 20 % en muertes",
+      "registros_afectados": 20792,
+      "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'mes_nombre': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 12,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'dia_semana': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 7,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'escenario': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 20,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'zona': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 1,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'clase_accidente': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 7,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'medio_transporte': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 10,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'objeto_colision': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 17,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'circunstancia': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 65,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Texto inconsistente",
+      "problema": "'condicion_victima': valores que solo cambian en mayúsculas, tildes o espacios",
+      "registros_afectados": 1,
+      "tratamiento": "Normalización: etiqueta canónica"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Cambio de catálogo",
+      "problema": "'Choque con otro vehículo' pasa a llamarse 'Choque' desde 2019",
+      "registros_afectados": 246282,
+      "tratamiento": "Normalización: unificar en 'Choque'"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Catálogo extenso",
+      "problema": "Causas distintas (137 en lesiones, 65 en muertes, con variantes)",
+      "registros_afectados": 145,
+      "tratamiento": "Enriquecimiento: agrupar en 9 categorías de causa comparables"
+    },
+    {
+      "fuente": "Medicina Legal lesiones",
+      "categoria": "Cambio de catálogo",
+      "problema": "Días de incapacidad con 9 etiquetas distintas para 4 conceptos (p. ej. 'Cero', 'Cero días', 'Sin días de incapacidad')",
+      "registros_afectados": 9,
+      "tratamiento": "Enriquecimiento: gravedad leve (0-30 días) / grave (> 30 días)"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Formato de códigos",
+      "problema": "Códigos DANE de municipio sin el cero inicial (4 dígitos)",
+      "registros_afectados": 66012,
+      "tratamiento": "Normalización: completar a 5 dígitos"
+    },
+    {
+      "fuente": "Policía",
+      "categoria": "Formato de códigos",
+      "problema": "Código DANE de 8 dígitos y municipio con sufijo '(CT)'",
+      "registros_afectados": 559868,
+      "tratamiento": "Normalización: 5 primeros dígitos y nombre oficial DANE"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "categoria": "Columnas sin aporte",
+      "problema": "Columnas constantes o con > 60 % sin dato",
+      "registros_afectados": 13,
+      "tratamiento": "Limpieza: excluir de la base analítica (motivo documentado)"
+    }
+  ],
+  "pasos_etl": [
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Limpieza",
+      "etapa": "Esquema común (columnas)",
+      "antes": 77,
+      "despues": 41,
+      "diferencia": -36,
+      "detalle": "Renombrado a snake_case; 5 pares de columnas equivalentes con nombre distinto"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Limpieza",
+      "etapa": "Eliminar duplicados (sin ID)",
+      "antes": 416199,
+      "despues": 415933,
+      "diferencia": -266,
+      "detalle": ""
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Limpieza",
+      "etapa": "Validar periodo",
+      "antes": 415933,
+      "despues": 415933,
+      "diferencia": 0,
+      "detalle": ""
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Limpieza",
+      "etapa": "Excluir columnas constantes o casi vacías (columnas)",
+      "antes": 42,
+      "despues": 29,
+      "diferencia": -13,
+      "detalle": "Ver COLUMNAS_DESCARTADAS_INML"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Limpieza",
+      "etapa": "Celdas vacías -> 'Sin información'",
+      "antes": 73363,
+      "despues": 0,
+      "diferencia": -73363,
+      "detalle": ""
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Normalización",
+      "etapa": "Unificar escritura en 23 columnas de texto (valores únicos)",
+      "antes": 1686,
+      "despues": 1485,
+      "diferencia": -201,
+      "detalle": "Mayúsculas, tildes, espacios, paréntesis"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Normalización",
+      "etapa": "Clase de accidente: catálogos por año",
+      "antes": 17,
+      "despues": 13,
+      "diferencia": -4,
+      "detalle": "'Choque con otro vehículo' (2015-2018) = 'Choque' (2019-2024)"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Normalización",
+      "etapa": "Formato de rango horario",
+      "antes": 19,
+      "despues": 9,
+      "diferencia": -10,
+      "detalle": "'18:00 a 20:59', '(18:00 a  20:59)' -> '(18:00 a 20:59)'"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Normalización",
+      "etapa": "Zona del hecho",
+      "antes": 4,
+      "despues": 4,
+      "diferencia": 0,
+      "detalle": ""
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Normalización",
+      "etapa": "Códigos DANE a 5 y 2 dígitos",
+      "antes": 65973,
+      "despues": 0,
+      "diferencia": -65973,
+      "detalle": ""
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Normalización",
+      "etapa": "Tipos optimizados (MB en memoria)",
+      "antes": 264,
+      "despues": 15,
+      "diferencia": -249,
+      "detalle": ""
+    },
+    {
+      "fuente": "Policía lesiones",
+      "tecnica": "Limpieza",
+      "etapa": "Filtrar conducta de tránsito",
+      "antes": 1381416,
+      "despues": 455359,
+      "diferencia": -926057,
+      "detalle": "Se excluyen lesiones personales (art. 111, 119...) y 8.651 'ART. 120' sin mención de tránsito"
+    },
+    {
+      "fuente": "Policía",
+      "tecnica": "Limpieza",
+      "etapa": "Filtrar periodo 2015-2024",
+      "antes": 553789,
+      "despues": 351380,
+      "diferencia": -202409,
+      "detalle": ""
+    },
+    {
+      "fuente": "Policía",
+      "tecnica": "Limpieza",
+      "etapa": "Marcar medio incoherente con tránsito",
+      "antes": 0,
+      "despues": 1228,
+      "diferencia": 1228,
+      "detalle": "Escopolamina, armas, contundentes -> medio 'Sin información'"
+    },
+    {
+      "fuente": "Policía",
+      "tecnica": "Limpieza",
+      "etapa": "Género/edad vacíos -> 'Sin información'",
+      "antes": 1103,
+      "despues": 0,
+      "diferencia": -1103,
+      "detalle": ""
+    },
+    {
+      "fuente": "Policía",
+      "tecnica": "Normalización",
+      "etapa": "Municipio y departamento con nombre oficial DANE (vía código)",
+      "antes": 351380,
+      "despues": 351354,
+      "diferencia": -26,
+      "detalle": "26 filas con municipio sin víctimas en Medicina Legal: se limpia el nombre de la Policía"
+    },
+    {
+      "fuente": "Policía",
+      "tecnica": "Normalización",
+      "etapa": "Expandir CANTIDAD: una fila por víctima",
+      "antes": 351380,
+      "despues": 544690,
+      "diferencia": 193310,
+      "detalle": "Misma unidad de análisis que Medicina Legal"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Enriquecimiento",
+      "etapa": "Gravedad (leve/grave/muerte) con dato",
+      "antes": 415933,
+      "despues": 398950,
+      "diferencia": -16983,
+      "detalle": "Leve: 0-30 días de incapacidad; grave: > 30 días"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Enriquecimiento",
+      "etapa": "Causas: valores distintos -> categorías",
+      "antes": 80,
+      "despues": 11,
+      "diferencia": -69,
+      "detalle": "Catálogo aplicado en data/reference/catalogo_causas.csv"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Enriquecimiento",
+      "etapa": "Medio y objeto de colisión agrupados (categorías)",
+      "antes": 105,
+      "despues": 16,
+      "diferencia": -89,
+      "detalle": ""
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Enriquecimiento",
+      "etapa": "Cruce con regiones naturales (filas con región)",
+      "antes": 415933,
+      "despues": 415857,
+      "diferencia": -76,
+      "detalle": ""
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Enriquecimiento",
+      "etapa": "Contexto policial del municipio (año anterior)",
+      "antes": 415933,
+      "despues": 413204,
+      "diferencia": -2729,
+      "detalle": "Filas cuyo municipio tuvo víctimas policiales el año previo"
+    },
+    {
+      "fuente": "Medicina Legal",
+      "tecnica": "Enriquecimiento",
+      "etapa": "Columnas de la base analítica",
+      "antes": 30,
+      "despues": 44,
+      "diferencia": 14,
+      "detalle": ""
+    }
+  ],
+  "agregaciones": {
+    "cubo_geografico": 1302,
+    "cubo_temporal": 3362,
+    "cubo_perfil_victima": 1194,
+    "cubo_gravedad_medicina_legal": 7849,
+    "cubo_causas": 338,
+    "cobertura_entre_fuentes": 667
+  }
+}
