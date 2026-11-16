@@ -1,0 +1,140 @@
+# Gravedad de los siniestros de transporte en Colombia (2015-2024)
+### Pipeline integral de Big Data con Machine Learning, almacenamiento híbrido y dashboard contenerizado
+
+**Proyecto final — Gerencia y almacenamiento en Big Data** · Autor: **Juan Rojas** · Modalidad individual
+
+**Video de sustentación:** _[pendiente: pegar aquí el enlace no listado]_
+
+---
+
+## 1. Descripción
+
+El proyecto integra **4 fuentes oficiales** de [datos.gov.co](https://www.datos.gov.co) sobre víctimas de siniestros de transporte y construye un producto de datos completo: ETL, análisis, modelo de Machine Learning, almacenamiento en MongoDB, reporte PDF y dashboard.
+
+| Fuente | Entidad | Id | Filas crudas | Periodo | Qué registra |
+|---|---|---|---|---|---|
+| [Lesiones por eventos de transporte](https://www.datos.gov.co/d/ezhf-hscf) | Medicina Legal (INMLCF) | `ezhf-hscf` | 342.796 | 2015-2024 | Víctimas lesionadas con examen médico-legal (39 variables) |
+| [Muertes por eventos de transporte](https://www.datos.gov.co/d/s65h-7665) | Medicina Legal (INMLCF) | `s65h-7665` | 73.403 | 2015-2024 | Víctimas fallecidas con necropsia (38 variables) |
+| [Lesiones personales y en accidente de tránsito](https://www.datos.gov.co/d/72sg-cybi) | Policía Nacional | `72sg-cybi` | 1.381.416 | 2010-2026 | Denuncias de lesiones (se filtran las de tránsito) |
+| [Homicidios accidente de tránsito](https://www.datos.gov.co/d/ha6j-pa2r) | Policía Nacional | `ha6j-pa2r` | 98.430 | 2010-2026 | Denuncias de homicidio culposo en tránsito |
+
+Tras filtrar tránsito y el periodo común **2015-2024**: **767.313 registros**, equivalentes a **960.623 víctimas** (algunas filas de la Policía agrupan varias víctimas). Peso: 492 MB en CSV · 14 MB en Parquet.
+
+**Pregunta de negocio:** ¿Qué características de la víctima, del vehículo y del contexto se asocian con la gravedad de un siniestro de transporte (lesión leve, lesión grave o muerte), y cuáles son las causas más frecuentes en lesionados y fallecidos?
+
+**Tarea de ML:** clasificación multiclase de `gravedad` (lesión leve: 0-30 días de incapacidad; lesión grave: > 30 días; muerte), con validación temporal (2015-2022 entrenamiento, 2023-2024 prueba).
+
+## 2. Arquitectura
+
+```
+                 ┌─────────────────────────────── red interna de Docker ───────────────────────────────┐
+  datos.gov.co ─►│  procesamiento (Jupyter + pandas)  ──insights──►  mongodb (mongo:7.0)               │
+  (o respaldo    │      │  descarga → ETL → modelo → PDF                    ▲                           │
+   en GitHub)    │      ▼                                                    │ lee insights              │
+                 │  volumen ./data  ./models  ./reports  ───── lee ────►  app (Streamlit)               │
+                 └──────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- **procesamiento:** descarga las 4 fuentes, ejecuta el ETL y deja Jupyter Lab listo para correr el notebook.
+- **mongodb:** almacena el documento de análisis (metadata, calidad, estadísticas, modelo, insights, recomendaciones). Persistencia en el volumen `mongo_datos`.
+- **app:** dashboard Streamlit que **solo lee** resultados ya procesados (Parquet, modelo, MongoDB y PDF).
+
+**Decisión pandas vs. Spark:** **pandas**. Los 4 CSV ocupan ~640 MB en memoria como texto y ~43 MB con tipos `category` (−93 %); se leen en ~5 s y el ETL completo tarda ~1 minuto con un pico de ~2,2 GB de RAM. Mediciones en la sección 2 del notebook.
+
+## 3. Estructura del repositorio
+
+```
+Rojas_Juan_BigData_ProyectoFinal/
+├── README.md
+├── docker-compose.yml
+├── .env.example
+├── data/
+│   ├── raw/                  # Vacía en la entrega; la llena src/descargar_datos.py
+│   ├── processed/            # Parquet: base analítica, base unificada y cubos OLAP
+│   └── reference/            # Regiones (DANE) y catálogo de causas aplicado
+├── notebooks/
+│   └── Rojas_Juan_BigData_ProyectoFinal.ipynb
+├── src/
+│   ├── config.py             # Rutas relativas, fuentes y parámetros
+│   ├── descargar_datos.py    # Descarga de las 4 fuentes (oficial con respaldo en GitHub)
+│   └── etl.py                # Diagnóstico de calidad, unificación y 4 técnicas ETL
+├── respaldo_datos/           # CSV originales comprimidos (respaldo de descarga)
+├── processing/               # Dockerfile y requirements del servicio Jupyter
+├── models/                   # Modelo entrenado
+├── reports/                  # Reporte PDF generado
+└── app/
+    ├── Dockerfile
+    └── app.py
+```
+
+## 4. Requisitos
+
+- Docker Desktop (o Docker Engine) con **Docker Compose v2**.
+- ~4 GB de RAM libres para el contenedor de procesamiento y ~2 GB de disco.
+- Conexión a internet la primera vez (imágenes y ~490 MB de datos).
+
+## 5. Cómo ejecutar
+
+```bash
+git clone https://github.com/ingjuancrojasl-crypto/Rojas_Juan_BigData_ProyectoFinal.git
+cd Rojas_Juan_BigData_ProyectoFinal
+cp .env.example .env          # en Windows PowerShell: copy .env.example .env
+docker compose up --build
+```
+
+### Orden de ejecución
+1. **mongodb** arranca y espera a estar sano (`healthcheck` con `ping`).
+2. **procesamiento** descarga las 4 fuentes a `data/raw/` (si faltan), ejecuta el ETL (si no existen los Parquet) y abre Jupyter Lab.
+3. **app** arranca Streamlit y lee los resultados.
+
+### Puertos
+
+| Servicio | URL | Notas |
+|---|---|---|
+| Jupyter Lab | http://localhost:8888 | Token = `JUPYTER_TOKEN` del `.env` |
+| Dashboard | http://localhost:8501 | |
+| MongoDB | `localhost:27017` | Usuario y clave del `.env` |
+
+### Cómo verificar que todo funciona
+1. `docker compose ps` muestra los tres servicios en `running` y mongodb como `healthy`.
+2. `docker compose logs procesamiento` termina con `ETL terminado` y la URL de Jupyter.
+3. Existen `data/processed/siniestros_unificado.parquet` y `data/processed/victimas_medicina_legal.parquet`.
+4. En http://localhost:8501 aparecen 960.623 víctimas (4 fuentes) y 415.933 de Medicina Legal, y en *Estado de los servicios* el mensaje "MongoDB responde correctamente".
+5. En Jupyter, abrir `notebooks/Rojas_Juan_BigData_ProyectoFinal.ipynb` y ejecutar **Kernel → Restart & Run All** sin errores.
+
+### Ejecutar sin Docker (opcional)
+```bash
+pip install -r processing/requirements.txt
+python src/descargar_datos.py
+python src/etl.py
+```
+
+## 6. Problemas de infraestructura documentados
+
+### 6.1 La descarga oficial falla o llega incompleta
+- **Síntoma:** `src/descargar_datos.py` mostró `falló (Tunnel connection failed: 403 Forbidden)` en un entorno con salida a internet restringida por proxy. Además, la URL `.../resource/<id>.csv` devuelve solo **1.000 filas** (límite por defecto de la API Socrata), sin ningún error visible.
+- **Diagnóstico:** la URL abría en el navegador (el dataset seguía publicado) pero `curl` desde el mismo entorno devolvía `CONNECT tunnel failed, response 403`: el bloqueo estaba en el proxy de red.
+- **Solución:** el script usa la descarga completa (`/api/views/<id>/rows.csv?accessType=DOWNLOAD`), valida un mínimo de filas por fuente y, si falla, usa el respaldo comprimido de `respaldo_datos/` en GitHub. La fuente usada queda en `data/raw/metadata_descarga.json`.
+
+### 6.2 `entrypoint.sh` falla en Windows por finales de línea CRLF
+- **Síntoma:** al clonar en Windows, el contenedor de procesamiento puede terminar con `/bin/sh^M: bad interpreter`.
+- **Diagnóstico:** Git en Windows convierte `LF` → `CRLF`; el `\r` final impide que Linux reconozca el intérprete.
+- **Solución:** `.gitattributes` fuerza `*.sh text eol=lf`.
+
+### 6.3 Límite de 25 MB por archivo en la carga web de GitHub
+- **Síntoma:** los CSV originales (hasta 238 MB) no se pueden subir al repositorio.
+- **Solución:** cada fuente se comprime por separado en `respaldo_datos/` (entre 0,9 y 12 MB cada una) y `data/raw/` queda fuera del control de versiones (`.gitignore`).
+
+## 7. Estado del proyecto
+
+| Paso de la guía | Estado |
+|---|---|
+| 1. Business Understanding y selección del dataset | ✅ |
+| 2. Decisión pandas vs. Spark | ✅ |
+| 3. ETL con CRISP-DM (unificación de 4 fuentes, 4 técnicas, Parquet, OLAP) | ✅ |
+| 4. Análisis exploratorio y visualizaciones | ⏳ |
+| 5. Machine Learning | ⏳ |
+| 6. Insights en MongoDB | ⏳ |
+| 7. Reporte PDF | ⏳ |
+| 8. Dashboard Streamlit (5 secciones) | ⏳ versión inicial |
+| 9. Docker | ✅ estructura base |
