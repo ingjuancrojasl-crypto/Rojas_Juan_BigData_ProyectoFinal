@@ -28,11 +28,11 @@ ARCHIVO_REGIONES = DIR_REFERENCIA / "regiones_departamentos.csv"
 ARCHIVO_CATALOGO_CAUSAS = DIR_REFERENCIA / "catalogo_causas.csv"
 
 # ---------------------------------------------------------------------------
-# Fuentes (datos.gov.co) con respaldo comprimido en GitHub
+# Fuentes: CSV comprimidos en el GitHub del proyecto (principal) y datos.gov.co (respaldo oficial)
 # ---------------------------------------------------------------------------
 _BASE_DESCARGA = "https://www.datos.gov.co/api/views/{id}/rows.csv?accessType=DOWNLOAD"
 _BASE_RESPALDO = ("https://raw.githubusercontent.com/ingjuancrojasl-crypto/"
-                  "Rojas_Juan_BigData_ProyectoFinal/main/respaldo_datos/{nombre}.zip")
+                  "Rojas_Juan_BigData_ProyectoFinal/main/{nombre}.zip")
 
 FUENTES = {
     "inml_lesiones": {

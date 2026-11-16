@@ -166,6 +166,27 @@ def clave(texto) -> str:
 ES_SIN_INFO = re.compile(r"^(sin informacion|no sabe / no informa|no reporta|no reportado|por determinar|)$")
 
 
+def es_sin_informacion(serie: pd.Series) -> pd.Series:
+    """Marca los valores vacíos o equivalentes a 'Sin información'.
+
+    Evalúa cada valor distinto una sola vez (en vez de fila por fila), lo que lo hace
+    cientos de veces más rápido en columnas de millones de filas con pocos valores distintos.
+    """
+    unicos = serie.dropna().unique()
+    marcas = {v: bool(ES_SIN_INFO.match(clave(v))) for v in unicos}
+    return serie.map(marcas).fillna(True).astype(bool)
+
+
+def pct_sin_informacion(serie: pd.Series) -> float:
+    return float(es_sin_informacion(serie).mean() * 100)
+
+
+def mapear_unicos(serie: pd.Series, funcion) -> pd.Series:
+    """Aplica `funcion` una vez por valor distinto y propaga el resultado (mucho más rápido que fila a fila)."""
+    unicos = pd.Series(serie.unique())
+    return serie.map(dict(zip(unicos, unicos.map(funcion))))
+
+
 def mapear_por_reglas(serie: pd.Series, reglas: list[tuple[str, str]], por_defecto: str = "Otros") -> pd.Series:
     """Asigna una categoría a cada valor único (rápido: se evalúa una vez por valor distinto)."""
     def categoria(valor):
@@ -183,8 +204,7 @@ def mapear_por_reglas(serie: pd.Series, reglas: list[tuple[str, str]], por_defec
 def canonico(serie: pd.Series) -> pd.Series:
     """Unifica variantes de escritura: por cada clave elige la escritura más frecuente."""
     texto = serie.fillna(SI).astype(str).str.strip()
-    claves = texto.map(clave)
-    claves = claves.where(~claves.str.match(ES_SIN_INFO.pattern), "sin informacion")
+    claves = mapear_unicos(texto, lambda v: "sin informacion" if ES_SIN_INFO.match(clave(v)) else clave(v))
     tabla = (pd.DataFrame({"t": texto, "k": claves}).value_counts().reset_index()
              .drop_duplicates("k").set_index("k")["t"])
     tabla["sin informacion"] = SI
@@ -277,11 +297,10 @@ def diagnosticar_calidad(fuentes: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     for col, desc in [("rango_hora", "hora del hecho"), ("circunstancia", "causa (circunstancia)"),
                       ("actividad", "actividad durante el hecho"), ("escolaridad", "escolaridad")]:
-        pl = L[col].map(clave).str.match(ES_SIN_INFO.pattern).mean() * 100
-        pm = M[col].map(clave).str.match(ES_SIN_INFO.pattern).mean() * 100
+        sl, sm = es_sin_informacion(L[col]), es_sin_informacion(M[col])
+        pl, pm = sl.mean() * 100, sm.mean() * 100
         P.append(("Medicina Legal", "Registro desigual", f"Sin dato de {desc}: {pl:.0f} % en lesiones vs "
-                  f"{pm:.0f} % en muertes", int(L[col].map(clave).str.match(ES_SIN_INFO.pattern).sum()
-                                                 + M[col].map(clave).str.match(ES_SIN_INFO.pattern).sum()),
+                  f"{pm:.0f} % en muertes", int(sl.sum() + sm.sum()),
                   "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"))
 
     for col in ["mes_nombre", "dia_semana", "escenario", "zona", "clase_accidente", "medio_transporte",
@@ -405,23 +424,23 @@ def normalizar_inml(df_limpio: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
                        total_antes, total_despues, "Mayúsculas, tildes, espacios, paréntesis"))
 
     antes = df["clase_accidente"].nunique()
-    df["clase_accidente"] = df["clase_accidente"].map(lambda v: MAPA_CLASE.get(clave(v), v))
+    df["clase_accidente"] = mapear_unicos(df["clase_accidente"], lambda v: MAPA_CLASE.get(clave(v), v))
     pasos.append(_paso("Medicina Legal", "Normalización", "Clase de accidente: catálogos por año", antes,
                        df["clase_accidente"].nunique(), "'Choque con otro vehículo' (2015-2018) = 'Choque' (2019-2024)"))
 
     antes = df["rango_hora"].nunique()
-    df["rango_hora"] = df["rango_hora"].map(_formato_hora)
+    df["rango_hora"] = mapear_unicos(df["rango_hora"], _formato_hora)
     pasos.append(_paso("Medicina Legal", "Normalización", "Formato de rango horario", antes, df["rango_hora"].nunique(),
                        "'18:00 a 20:59', '(18:00 a  20:59)' -> '(18:00 a 20:59)'"))
 
     antes = df["zona"].nunique()
-    df["zona"] = df["zona"].map(lambda v: "Centro poblado" if "centro poblado" in clave(v) else v)
+    df["zona"] = mapear_unicos(df["zona"], lambda v: "Centro poblado" if "centro poblado" in clave(v) else v)
     pasos.append(_paso("Medicina Legal", "Normalización", "Zona del hecho", antes, df["zona"].nunique()))
 
     df["sexo"] = df["sexo"].replace({"Indeterminado": SI})
     df["condicion_victima"] = df["condicion_victima"].str.capitalize().replace({"Sin información": SI})
-    df["mes"] = df["mes_nombre"].map(lambda v: MESES.get(clave(v), 0)).astype("int8")
-    df["dia_semana"] = df["dia_semana"].map(lambda v: next((d for d in DIAS if clave(d) == clave(v)), SI))
+    df["mes"] = mapear_unicos(df["mes_nombre"], lambda v: MESES.get(clave(v), 0)).astype("int8")
+    df["dia_semana"] = mapear_unicos(df["dia_semana"], lambda v: next((d for d in DIAS if clave(d) == clave(v)), SI))
 
     cortos = int((df["codigo_dane_municipio"].str.len() < 5).sum())
     df["codigo_dane_municipio"] = df["codigo_dane_municipio"].str.zfill(5)
@@ -521,7 +540,8 @@ def enriquecer_inml(df_normal: pd.DataFrame, policia_todos_los_anios: pd.DataFra
     columnas = df.shape[1]
 
     df["desenlace"] = np.where(df["archivo_origen"] == "inml_muertes", "Muerte", "Lesión")
-    df["gravedad"] = [_gravedad(a, d) for a, d in zip(df["archivo_origen"].astype(str), df["dias_incapacidad"].astype(str))]
+    pares = df["archivo_origen"].astype(str) + "|" + df["dias_incapacidad"].astype(str)
+    df["gravedad"] = mapear_unicos(pares, lambda v: _gravedad(*v.split("|", 1)))
     pasos.append(_paso("Medicina Legal", "Enriquecimiento", "Gravedad (leve/grave/muerte) con dato", len(df),
                        int((df["gravedad"] != SI).sum()), "Leve: 0-30 días de incapacidad; grave: > 30 días"))
 
@@ -541,11 +561,11 @@ def enriquecer_inml(df_normal: pd.DataFrame, policia_todos_los_anios: pd.DataFra
 
     ciclo = {"Primera Infancia": "Menores (0-11)", "Infancia": "Menores (0-11)", "Adolescencia": "Adolescentes (12-17)",
              "Juventud": "Adultos (18 y más)", "Adultez": "Adultos (18 y más)", "Adulto Mayor": "Adultos (18 y más)"}
-    df["grupo_edad_comun"] = df["ciclo_vital"].astype(str).map(
-        lambda v: next((g for k, g in ciclo.items() if k.lower() in v.lower()), SI))
+    df["grupo_edad_comun"] = mapear_unicos(df["ciclo_vital"].astype(str),
+                                           lambda v: next((g for k, g in ciclo.items() if k.lower() in v.lower()), SI))
     df["adulto_mayor"] = df["ciclo_vital"].astype(str).str.contains("Adulto Mayor").astype("int8")
 
-    df["franja_horaria"] = df["rango_hora"].astype(str).map(_franja)
+    df["franja_horaria"] = mapear_unicos(df["rango_hora"].astype(str), _franja)
     df["fin_de_semana"] = df["dia_semana"].isin(["Sábado", "Domingo"]).astype("int8")
     df["trimestre"] = np.where(df["mes"] > 0, (df["mes"] - 1) // 3 + 1, 0).astype("int8")
     escenario = {"Calle urbana": r"calle", "Carretera": r"carretera", "Vía pública (sin especificar)": r"via publica"}

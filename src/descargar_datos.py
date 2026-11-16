@@ -2,8 +2,9 @@
 Descarga las 4 fuentes del proyecto y las deja en data/raw/.
 
 Para cada fuente:
-  1. Intenta la descarga completa oficial (datos.gov.co).
-  2. Si falla, usa el respaldo comprimido del repositorio en GitHub.
+  1. Descarga el CSV comprimido (.zip) publicado en el repositorio de GitHub del proyecto
+     (fuente principal: ~26 MB en total, rápida y estable).
+  2. Si falla, descarga el CSV completo desde datos.gov.co (fuente oficial, ~490 MB).
   3. Valida que el archivo tenga el mínimo de filas esperado (evita aceptar
      vistas parciales de la API, que por defecto devuelve solo 1.000 filas).
   4. Registra fuente, URL, fecha, filas y peso en data/raw/metadata_descarga.json.
@@ -11,7 +12,7 @@ Para cada fuente:
 Uso:
     python src/descargar_datos.py             # descarga solo lo que falte
     python src/descargar_datos.py --forzar    # vuelve a descargar todo
-    python src/descargar_datos.py --fuente github
+    python src/descargar_datos.py --fuente oficial   # forzar datos.gov.co
 """
 from __future__ import annotations
 
@@ -27,6 +28,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import config  # noqa: E402
+
+# En Windows la consola usa cp1252 por defecto y falla al imprimir caracteres como "✓" o "→".
+for _flujo in (sys.stdout, sys.stderr):
+    if hasattr(_flujo, "reconfigure"):
+        _flujo.reconfigure(encoding="utf-8", errors="replace")
 
 BLOQUE = 1024 * 1024
 
@@ -68,7 +74,7 @@ def descargar_fuente(nombre: str, fuente: dict, modo: str, forzar: bool) -> dict
         return {"fuente_usada": "existente", "url_descarga": fuente["url_oficial"], "filas": _contar_filas(destino)}
 
     metodos = {"oficial": [("oficial", _oficial)], "github": [("github", _respaldo)],
-               "auto": [("oficial", _oficial), ("github", _respaldo)]}[modo]
+               "auto": [("github", _respaldo), ("oficial", _oficial)]}[modo]
     temporal = destino.with_suffix(".tmp")
     for etiqueta, metodo in metodos:
         print(f"→ {nombre}: intentando fuente {etiqueta}")
@@ -83,14 +89,11 @@ def descargar_fuente(nombre: str, fuente: dict, modo: str, forzar: bool) -> dict
         except Exception as error:
             print(f"  ✗ falló ({error})")
             temporal.unlink(missing_ok=True)
-    raise SystemExit(f"No se pudo descargar '{nombre}' desde ninguna fuente.")
+    raise RuntimeError(f"No se pudo descargar '{nombre}' desde ninguna fuente.")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--forzar", action="store_true")
-    parser.add_argument("--fuente", choices=["auto", "oficial", "github"], default="auto")
-    args = parser.parse_args()
+def descargar_todo(modo: str = "auto", forzar: bool = False) -> dict:
+    """Descarga las fuentes que falten y devuelve los metadatos. Se puede llamar desde el notebook."""
     config.crear_directorios()
 
     previa = {}
@@ -99,7 +102,7 @@ def main() -> None:
 
     metadata = {}
     for nombre, fuente in config.FUENTES.items():
-        resultado = descargar_fuente(nombre, fuente, args.fuente, args.forzar)
+        resultado = descargar_fuente(nombre, fuente, modo, forzar)
         if resultado["fuente_usada"] == "existente" and nombre in previa:
             metadata[nombre] = previa[nombre]
             continue
@@ -111,6 +114,15 @@ def main() -> None:
         }
     config.ARCHIVO_METADATA_DESCARGA.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Metadatos en {config.ARCHIVO_METADATA_DESCARGA.relative_to(config.RAIZ_PROYECTO)}")
+    return metadata
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--forzar", action="store_true")
+    parser.add_argument("--fuente", choices=["auto", "oficial", "github"], default="auto")
+    args = parser.parse_args()
+    descargar_todo(args.fuente, args.forzar)
 
 
 if __name__ == "__main__":
