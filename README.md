@@ -100,7 +100,7 @@ docker compose up --build
 1. `docker compose ps` muestra los tres servicios en `running` y mongodb como `healthy`.
 2. `docker compose logs procesamiento` termina con `ETL terminado` y la URL de Jupyter.
 3. Existen `data/processed/siniestros_unificado.parquet` y `data/processed/victimas_medicina_legal.parquet`.
-4. En http://localhost:8501 aparecen 960.623 víctimas (4 fuentes) y 415.933 de Medicina Legal, y en *Estado de los servicios* el mensaje "MongoDB responde correctamente".
+4. En http://localhost:8501 aparecen las 5 pestañas del dashboard con 960.623 víctimas (4 fuentes) y, en la barra lateral, "Documento de análisis: MongoDB ✅".
 5. En Jupyter, abrir `notebooks/Rojas_Juan_BigData_ProyectoFinal.ipynb` y ejecutar **Kernel → Restart & Run All** sin errores.
 
 ### Ejecutar sin Docker (opcional)
@@ -108,7 +108,21 @@ docker compose up --build
 pip install -r processing/requirements.txt
 python src/descargar_datos.py
 python src/etl.py
+python src/reporte_pdf.py          # requiere MongoDB encendido y la sección 6 ejecutada
+pip install -r app/requirements.txt
+streamlit run app/app.py           # abre http://localhost:8501
 ```
+
+### Dashboard (Streamlit)
+| Pestaña | Contenido |
+|---|---|
+| 📊 Resumen | KPIs del dataset y del modelo, evolución anual de muertes y lesionados |
+| 🗂️ Datos | Muestra filtrable del dataset limpio (descarga CSV) y cubos OLAP con roll-up y pivot |
+| 📈 Visualizaciones | 7 gráficas interactivas (Plotly) con filtros de año, región y medio de transporte |
+| 🤖 Modelo | Métricas, comparación con las líneas base, matriz de confusión, importancia y simulador de predicción |
+| 💡 Insights y reporte | Insights y recomendaciones leídos desde MongoDB (filtro por tema y prioridad) y descarga del PDF |
+
+La app **no repite el ETL ni reentrena**: lee los Parquet de `data/processed/`, el modelo de `models/` y el documento de MongoDB (si MongoDB no responde, muestra la copia `reports/documento_mongodb.json` y lo avisa).
 
 ## 6. Problemas de infraestructura documentados
 
@@ -127,7 +141,12 @@ python src/etl.py
 - **Diagnóstico:** el error real ocurría en el proceso hijo: la consola de Windows usa la codificación cp1252 y no puede imprimir caracteres como `✓` o `→` (`UnicodeEncodeError`). Además, los respaldos estaban en la raíz del repositorio y no en la carpeta que esperaba el script.
 - **Solución:** el script reconfigura su salida a UTF-8, el notebook llama a `descargar_datos.descargar_todo()` en el mismo proceso (los errores se ven completos en la celda) y la URL de respaldo apunta a la raíz del repositorio.
 
-### 6.4 Límite de 25 MB por archivo en la carga web de GitHub
+### 6.4 MongoDB rechaza la escritura aunque la conexión responde
+- **Síntoma:** en la sección 6, la conexión mostraba éxito, pero al guardar aparecía `AutoReconnect: connection closed` y luego `OperationFailure: Command insert requires authentication`. Antes, con el contenedor apagado, el error era `ServerSelectionTimeoutError`.
+- **Diagnóstico:** el comando `ping` responde aunque no haya usuario; el archivo `.env` no existía, así que la URI se armaba sin credenciales (`mongodb://localhost:27017/`) y el servidor rechazaba toda escritura.
+- **Solución:** crear `.env` en la raíz con `MONGO_USER`/`MONGO_PASSWORD` (desde PowerShell con `Set-Content` para evitar el `.env.txt` del Bloc de notas), reiniciar el kernel y validar la autenticación al conectar (`list_collection_names()`), que ahora muestra un mensaje claro con la ruta esperada del `.env`.
+
+### 6.5 Límite de 25 MB por archivo en la carga web de GitHub
 - **Síntoma:** los CSV originales (hasta 238 MB) no se pueden subir al repositorio.
 - **Solución:** cada fuente se comprime por separado en un .zip en la raíz del repositorio (entre 0,9 y 12 MB cada uno) y `data/raw/` queda fuera del control de versiones (`.gitignore`).
 
@@ -142,5 +161,5 @@ python src/etl.py
 | 5. Machine Learning | ✅ |
 | 6. Insights en MongoDB | ✅ |
 | 7. Reporte PDF | ✅ |
-| 8. Dashboard Streamlit (5 secciones) | ⏳ versión inicial |
+| 8. Dashboard Streamlit (5 secciones) | ✅ |
 | 9. Docker | ✅ estructura base |
