@@ -1,0 +1,14 @@
+# Tema del dashboard: Streamlit lo lee al ejecutar "streamlit run app/app.py" desde la raíz del proyecto
+[theme]
+base = "light"
+primaryColor = "#3f8de0"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#eef3fa"
+textColor = "#1f2937"
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
