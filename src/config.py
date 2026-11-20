@@ -78,9 +78,36 @@ SEMILLA = 42
 # ---------------------------------------------------------------------------
 # MongoDB (credenciales por variables de entorno desde .env)
 # ---------------------------------------------------------------------------
-MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
+def _cargar_env(ruta: Path) -> None:
+    """Lee el archivo .env de la raíz (si existe) sin sobrescribir variables ya definidas (p. ej. en Docker)."""
+    if not ruta.exists():
+        return
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if linea and not linea.startswith("#") and "=" in linea:
+            clave, valor = linea.split("=", 1)
+            os.environ.setdefault(clave.strip(), valor.strip().strip('"').strip("'"))
+
+
+_cargar_env(RAIZ_PROYECTO / ".env")
+
+
+def _uri_mongo() -> str:
+    # 1) Docker Compose define MONGO_URI (host 'mongodb'); 2) en el equipo local se arma con usuario y clave del
+    # .env apuntando a localhost; 3) sin credenciales, MongoDB local sin autenticación.
+    if os.getenv("MONGO_URI"):
+        return os.environ["MONGO_URI"]
+    usuario, clave = os.getenv("MONGO_USER"), os.getenv("MONGO_PASSWORD")
+    puerto = os.getenv("MONGO_PORT", "27017")
+    if usuario and clave:
+        return f"mongodb://{usuario}:{clave}@localhost:{puerto}/?authSource=admin"
+    return f"mongodb://localhost:{puerto}/"
+
+
+MONGO_URI = _uri_mongo()
 MONGO_DB = os.getenv("MONGO_DB", "siniestros_transporte")
 MONGO_COLECCION = os.getenv("MONGO_COLECCION", "analisis")
+MONGO_ID_DOCUMENTO = "siniestros_transporte_colombia_2015_2024"
 
 
 def crear_directorios() -> None:

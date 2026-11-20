@@ -678,3 +678,148 @@ def cobertura_fuentes(cubo_geografico: pd.DataFrame):
                 "muchos lesionados denuncian sin pasar por examen forense.")
     return fig, _cerrar(fig, "08_cobertura_fuentes", titulo, hallazgo, "P6: cobertura entre fuentes",
                         "Líneas con línea de referencia")
+
+
+# ---------------------------------------------------------------------------
+# 9-11. Resultados del modelo (sección 5)
+# ---------------------------------------------------------------------------
+def _pie(fig, texto: str) -> None:
+    fig.text(0.01, 0.01, texto, ha="left", va="bottom", fontsize=8, color=TINTA_SUAVE)
+    fig._margen_inferior = 0.05
+
+
+def matriz_confusion(matriz: np.ndarray, etiquetas: list[str], nombre_modelo: str):
+    """Matriz de confusión como mapa de calor viridis (mismo estilo de la gráfica 7): porcentaje de cada clase real,
+    celdas separadas por líneas blancas y valores en negrita."""
+    matriz = np.asarray(matriz)
+    porcentaje = matriz / matriz.sum(axis=1, keepdims=True) * 100
+    recall_muerte = porcentaje[etiquetas.index("Muerte"), etiquetas.index("Muerte")]
+    titulo = (f"El modelo identifica correctamente el {recall_muerte:.0f} % de las muertes; la mayor confusión está "
+              "entre lesión leve y lesión grave")
+
+    fig, ax = plt.subplots(figsize=(11, 6.8))
+    fig.patch.set_facecolor("#ffffff")
+    vmin, vmax = porcentaje.min(), porcentaje.max()
+    imagen = ax.imshow(porcentaje, cmap=plt.get_cmap("viridis"), aspect="auto", vmin=vmin, vmax=vmax)
+    # Líneas blancas entre celdas
+    ax.set_xticks(np.arange(-0.5, len(etiquetas), 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, len(etiquetas), 1), minor=True)
+    ax.grid(which="minor", color="#ffffff", linewidth=3.5)
+    ax.tick_params(which="minor", length=0)
+    for i in range(len(etiquetas)):
+        for j in range(len(etiquetas)):
+            valor = porcentaje[i, j]
+            claro = (valor - vmin) / (vmax - vmin) > 0.6          # en celdas verdes/amarillas el texto va en negro
+            color = "#1a1a1a" if claro else "#ffffff"
+            ax.text(j, i - 0.08, f"{valor:.0f} %", ha="center", va="center", fontsize=15, fontweight="bold",
+                    color=color)
+            ax.text(j, i + 0.22, f"({_miles(matriz[i, j])} víctimas)", ha="center", va="center", fontsize=8.5,
+                    color=color)
+    ax.set_xticks(range(len(etiquetas)), etiquetas, fontsize=11)
+    ax.set_yticks(range(len(etiquetas)), etiquetas, fontsize=10.5)
+    ax.tick_params(which="major", length=4, colors="#333333")
+    for lado in ax.spines.values():
+        lado.set_visible(False)
+    ax.set_xlabel("Gravedad predicha por el modelo", fontsize=11, color="#333333")
+    ax.set_ylabel("Gravedad real", fontsize=11, color="#333333")
+    barra = fig.colorbar(imagen, ax=ax, fraction=0.04, pad=0.04, shrink=0.75,
+                         format=mticker.PercentFormatter(decimals=0, symbol=" %"))
+    barra.set_label("Porcentaje de las víctimas de cada clase real", fontsize=10.5, color="#333333")
+    barra.ax.tick_params(labelsize=9, colors="#333333")
+    barra.outline.set_visible(False)
+
+    _encabezado_referencia(fig, "Matriz de Confusión del Modelo de Gravedad del Siniestro",
+                           f"{nombre_modelo.title()} — Datos de Prueba 2023-2024 ({_miles(matriz.sum())} Víctimas)")
+    fig.text(0.01, 0.01, "Fuente: elaboración propia con datos del Instituto Nacional de Medicina Legal y Ciencias "
+             "Forenses (datos.gov.co). La diagonal son los aciertos; cada fila suma 100 %.", ha="left", va="bottom",
+             fontsize=8, color=TINTA_SUAVE)
+    fig._margen_inferior = 0.04
+    hallazgo = (f"De cada 100 muertes reales, el modelo detecta {recall_muerte:.0f}. Acierta el "
+                f"{porcentaje[0, 0]:.0f} % de las lesiones leves y el {porcentaje[1, 1]:.0f} % de las graves: separar "
+                "leve de grave es lo más difícil, porque depende de días de incapacidad que no se conocen al momento del hecho.")
+    return fig, _cerrar(fig, "09_matriz_confusion", titulo, hallazgo, "Modelo: evaluación",
+                        "Matriz de confusión (mapa de calor, escala viridis)")
+
+
+def importancia_modelo(importancia: pd.DataFrame, nombre_modelo: str):
+    """Barras horizontales ordenadas (azul secuencial) con la importancia por permutación."""
+    tabla = importancia.sort_values("importancia").set_index("variable_negocio")["importancia"]
+    top = importancia.iloc[0]
+    titulo = (f"El medio de transporte y el objeto de colisión son los factores que más pesan en la gravedad, "
+              f"seguidos de la clase de accidente y la zona")
+    fig, ax = plt.subplots(figsize=(12, 6.6))
+    fig.patch.set_facecolor("#ffffff")
+    ax.set_facecolor("#ffffff")
+    for nombre, lado in ax.spines.items():
+        lado.set_visible(nombre in ("left", "bottom"))
+        lado.set_color("#333333")
+    ax.grid(True, axis="x", linestyle=(0, (4, 4)), linewidth=0.6, color="#d0d0d0")
+    ax.set_axisbelow(True)
+    escala = plt.get_cmap("Blues")
+    intensidad = 0.30 + 0.65 * (tabla - tabla.min()) / max(tabla.max() - tabla.min(), 1e-9)
+    ax.barh(tabla.index, tabla.values, height=0.75, color=[escala(i) for i in intensidad], edgecolor="#ffffff",
+            linewidth=0.8, zorder=3)
+    for posicion, valor in enumerate(tabla.values):
+        ax.text(valor + tabla.max() * 0.012, posicion, _dec(valor, 3), va="center", ha="left", fontsize=8.5,
+                fontweight="bold", color="#222222", zorder=4)
+    ax.set_xlim(0, tabla.max() * 1.15)
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _p: _dec(v, 2)))
+    ax.tick_params(axis="both", labelsize=8.5, colors="#222222")
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlabel("Caída del F1 macro al desordenar la variable (importancia por permutación)", fontsize=9.5,
+                  color="#222222")
+    ax.set_ylabel("Variable", fontsize=9.5, color="#222222")
+    _encabezado_referencia(fig, "Importancia de las Variables en el Modelo de Gravedad",
+                           f"{nombre_modelo} — Datos de prueba 2023-2024")
+    _pie(fig, "Fuente: elaboración propia con datos del INMLCF y la Policía Nacional (datos.gov.co). "
+              "Mayor valor = la variable aporta más a la predicción.")
+    hallazgo = (f"La variable más importante es {top['variable_negocio'].lower()}: al desordenarla, el F1 macro cae "
+                f"{_dec(top['importancia'], 3)}. Las variables del vehículo y del tipo de accidente pesan más que las "
+                "del calendario (mes, fin de semana).")
+    return fig, _cerrar(fig, "10_importancia_variables", titulo, hallazgo, "Modelo: interpretación",
+                        "Barras horizontales ordenadas con escala secuencial")
+
+
+def perfiles_riesgo(perfiles: pd.DataFrame):
+    """Probabilidad estimada de muerte por perfil: perfil base en gris, cambios en rojo secuencial."""
+    tabla = perfiles["Muerte"].mul(100).iloc[::-1]
+    base = perfiles["Muerte"].iloc[0] * 100
+    mayor_factor = perfiles.iloc[1:-1]["veces_riesgo_muerte_vs_base"].idxmax()
+    titulo = (f"Zona rural, objeto fijo y edad de 80+ multiplican por más de 3 la probabilidad de morir frente al "
+              "perfil base")
+    fig, ax = plt.subplots(figsize=(13, 6.8))
+    fig.patch.set_facecolor("#ffffff")
+    ax.set_facecolor("#ffffff")
+    for nombre, lado in ax.spines.items():
+        lado.set_visible(nombre in ("left", "bottom"))
+        lado.set_color("#333333")
+    ax.grid(True, axis="x", linestyle=(0, (4, 4)), linewidth=0.6, color="#d0d0d0")
+    ax.set_axisbelow(True)
+    escala = plt.get_cmap("Reds")
+    colores = []
+    for perfil, valor in tabla.items():
+        colores.append("#9e9e9e" if perfil.startswith("Perfil base") else escala(0.35 + 0.6 * valor / 100))
+    ax.barh(range(len(tabla)), tabla.values, height=0.7, color=colores, edgecolor="#ffffff", linewidth=0.8, zorder=3)
+    for posicion, (perfil, valor) in enumerate(tabla.items()):
+        veces = perfiles.loc[perfil, "veces_riesgo_muerte_vs_base"]
+        texto = f"{valor:.0f} %" if perfil.startswith("Perfil base") else f"{valor:.0f} %  (×{_dec(veces)})"
+        ax.text(valor + 1, posicion, texto, va="center", ha="left", fontsize=8.5, fontweight="bold",
+                color="#222222", zorder=5, bbox=dict(boxstyle="square,pad=0.15", facecolor="#ffffff", edgecolor="none"))
+    ax.axvline(base, color="#555555", linestyle=":", linewidth=1.2, zorder=4)
+    ax.set_yticks(range(len(tabla)), [textwrap.fill(p, 48) for p in tabla.index], fontsize=8.5)
+    ax.set_xlim(0, 112)
+    ax.set_xticks(range(0, 101, 10))
+    ax.xaxis.set_major_formatter(mticker.PercentFormatter(decimals=0, symbol=" %"))
+    ax.tick_params(axis="both", labelsize=8.5, colors="#222222")
+    ax.tick_params(axis="y", length=0)
+    ax.set_xlabel("Probabilidad estimada de muerte", fontsize=9.5, color="#222222")
+    ax.set_ylabel("Perfil de la víctima y del siniestro", fontsize=9.5, color="#222222")
+    _encabezado_referencia(fig, "Probabilidad de Muerte según el Perfil del Siniestro",
+                           "Estimación del Modelo — un factor a la vez frente al perfil base")
+    _pie(fig, "Fuente: elaboración propia con el modelo entrenado (INMLCF, 2015-2022). Gris = perfil base; "
+              "entre paréntesis: veces el riesgo del perfil base. Asociación, no causalidad.")
+    hallazgo = (f"Para un motociclista de 25-29 años que choca con un automóvil en la ciudad, la probabilidad "
+                f"estimada de morir es {base:.0f} %. El factor que más la eleva es '{mayor_factor.strip('… ')}' "
+                f"(×{_dec(perfiles.loc[mayor_factor, 'veces_riesgo_muerte_vs_base'])}); ser mujer la reduce a la mitad.")
+    return fig, _cerrar(fig, "11_perfiles_riesgo", titulo, hallazgo, "Modelo: interpretación para el negocio",
+                        "Barras horizontales con perfil de referencia")
