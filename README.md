@@ -57,11 +57,12 @@ Rojas_Juan_BigData_ProyectoFinal/
 ├── src/
 │   ├── config.py             # Rutas relativas, fuentes y parámetros
 │   ├── descargar_datos.py    # Descarga de las 4 fuentes (GitHub, con datos.gov.co como respaldo)
-│   └── etl.py                # Diagnóstico de calidad, unificación y 4 técnicas ETL
+│   ├── etl.py                # Diagnóstico de calidad, unificación y 4 técnicas ETL
+│   └── visualizaciones.py    # Gráficas del análisis exploratorio (principios de la Actividad 7)
 ├── *.zip                     # 4 CSV originales comprimidos (fuente de descarga del proyecto)
 ├── processing/               # Dockerfile y requirements del servicio Jupyter
 ├── models/                   # Modelo entrenado
-├── reports/                  # Reporte PDF generado
+├── reports/                  # Reporte PDF y figuras/ (gráficas PNG + registro visualizaciones.json)
 └── app/
     ├── Dockerfile
     └── app.py
@@ -137,9 +138,9 @@ python src/etl.py
 | 1. Business Understanding y selección del dataset | ✅ |
 | 2. Decisión pandas vs. Spark | ✅ |
 | 3. ETL con CRISP-DM (unificación de 4 fuentes, 4 técnicas, Parquet, OLAP) | ✅ |
-| 4. Análisis exploratorio y visualizaciones | ⏳ |
-| 5. Machine Learning | ⏳ |
-| 6. Insights en MongoDB | ⏳ |
-| 7. Reporte PDF | ⏳ |
+| 4. Análisis exploratorio y visualizaciones (8 gráficas + 3 consultas OLAP) | ✅ |
+| 5. Machine Learning | ✅ |
+| 6. Insights en MongoDB | ✅ |
+| 7. Reporte PDF | ✅ |
 | 8. Dashboard Streamlit (5 secciones) | ⏳ versión inicial |
 | 9. Docker | ✅ estructura base |
