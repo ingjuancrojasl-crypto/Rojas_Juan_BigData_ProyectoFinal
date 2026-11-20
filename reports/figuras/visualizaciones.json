@@ -1,0 +1,90 @@
+[
+  {
+    "nombre": "01_evolucion_anual",
+    "titulo": "Las muertes en siniestros viales llegan a su máximo en 2023 (+25 % frente a 2015), mientras las lesiones forenses siguen 32 % por debajo",
+    "tipo_grafico": "Líneas (paneles)",
+    "pregunta": "P1: evolución 2015-2024",
+    "hallazgo": "Las muertes registradas por Medicina Legal pasaron de 6.880 en 2015 a 8.580 en 2023. Las lesiones cayeron 61 % en 2020 por la pandemia y no recuperaron el nivel previo: en 2024 son 32 % menos que en 2015.",
+    "archivo": "reports/figuras/01_evolucion_anual.png"
+  },
+  {
+    "nombre": "02_distribucion_medio",
+    "titulo": "Las víctimas en motocicleta son 60 % de los lesionados y 57 % de los fallecidos",
+    "tipo_grafico": "Gráfico de mariposa (barras enfrentadas) con escala secuencial",
+    "pregunta": "P2/P3: perfil de la víctima y vehículo",
+    "hallazgo": "La motocicleta domina: 60 % de los lesionados y 57 % de los fallecidos. Los peatones pesan más entre los fallecidos (24 %) que entre los lesionados (17 %).",
+    "archivo": "reports/figuras/02_distribucion_medio.png"
+  },
+  {
+    "nombre": "03_distribucion_edad",
+    "titulo": "Los adultos de 20 a 34 años son el 41 % de los lesionados, pero los mayores de 60 pesan 2 veces más entre los fallecidos que entre los lesionados",
+    "tipo_grafico": "Barras verticales agrupadas",
+    "pregunta": "P2: perfil de la víctima",
+    "hallazgo": "El grupo de 20 a 34 años concentra el 41 % de los lesionados. Los mayores de 60 son 10 % de los lesionados pero 21 % de los fallecidos.",
+    "archivo": "reports/figuras/03_distribucion_edad.png"
+  },
+  {
+    "nombre": "04_gravedad_por_edad",
+    "titulo": "El riesgo de morir crece con la edad: a los 80 años o más fallece el 51 % de las víctimas, 3 veces más que entre los 25 y 34 años",
+    "tipo_grafico": "Barras 100 % apiladas (colores cualitativos)",
+    "pregunta": "P2: relación edad-gravedad",
+    "hallazgo": "La proporción de muertes es estable (~16 %) entre los 20 y 49 años y se dispara desde los 60: 23 % a los 60-64 y 51 % a los 80 o más. En niños de 5 a 9 años es solo 8 %.",
+    "archivo": "reports/figuras/04_gravedad_por_edad.png"
+  },
+  {
+    "nombre": "05_letalidad_objeto",
+    "titulo": "Chocar contra un objeto fijo es el evento más letal: muere el 67 % de las víctimas, 3,8 veces el promedio",
+    "tipo_grafico": "Barras horizontales ordenadas con escala secuencial",
+    "pregunta": "P3: vehículos y objetos más letales",
+    "hallazgo": "Objeto fijo (67 %) y sin colisión, es decir volcamientos y caídas (37 %), son los más letales; el promedio es 18 %. Chocar con un vehículo de carga pesada mata al 21 % de las víctimas, frente al 8 % con un automóvil.",
+    "archivo": "reports/figuras/05_letalidad_objeto.png"
+  },
+  {
+    "nombre": "06_causas",
+    "titulo": "Desobedecer señales y normas y exceso de velocidad explican el 79 % de las muertes con causa conocida; en lesionados pesan también las maniobras peligrosas",
+    "tipo_grafico": "Barras horizontales agrupadas",
+    "pregunta": "P4: causas más frecuentes",
+    "hallazgo": "Entre los fallecidos con causa registrada, desobedecer señales y normas (40 %) y exceso de velocidad (40 %) dominan. Entre los lesionados predominan las maniobras peligrosas (26 %) y la imprudencia del peatón (14 %). Las causas de muerte se registran con un catálogo más corto, por lo que la comparación es indicativa.",
+    "archivo": "reports/figuras/06_causas.png"
+  },
+  {
+    "nombre": "07_letalidad_region_zona",
+    "titulo": "Un siniestro en zona rural es entre 3,0 y 4,3 veces más letal que en la cabecera municipal, en todas las regiones",
+    "tipo_grafico": "Mapa de calor (escala viridis)",
+    "pregunta": "P5: dónde son más graves",
+    "hallazgo": "En la cabecera municipal muere entre el 11 % y el 22 % de las víctimas; en zona rural, entre el 48 % y el 65 %. La región más crítica en zona rural es Amazonía (65 %).",
+    "archivo": "reports/figuras/07_letalidad_region_zona.png"
+  },
+  {
+    "nombre": "08_cobertura_fuentes",
+    "titulo": "La Policía registra hasta 1,9 veces más lesionados que Medicina Legal, pero siempre menos muertes: ninguna fuente sola dimensiona el problema",
+    "tipo_grafico": "Líneas con línea de referencia",
+    "pregunta": "P6: cobertura entre fuentes",
+    "hallazgo": "En muertes la razón está entre 0,77 y 0,94: no toda muerte llega a denuncia. En lesiones va de 0,93 a 1,90: muchos lesionados denuncian sin pasar por examen forense.",
+    "archivo": "reports/figuras/08_cobertura_fuentes.png"
+  },
+  {
+    "nombre": "09_matriz_confusion",
+    "titulo": "El modelo identifica correctamente el 70 % de las muertes; la mayor confusión está entre lesión leve y lesión grave",
+    "tipo_grafico": "Matriz de confusión (mapa de calor, escala viridis)",
+    "pregunta": "Modelo: evaluación",
+    "hallazgo": "De cada 100 muertes reales, el modelo detecta 70. Acierta el 48 % de las lesiones leves y el 43 % de las graves: separar leve de grave es lo más difícil, porque depende de días de incapacidad que no se conocen al momento del hecho.",
+    "archivo": "reports/figuras/09_matriz_confusion.png"
+  },
+  {
+    "nombre": "10_importancia_variables",
+    "titulo": "El medio de transporte y el objeto de colisión son los factores que más pesan en la gravedad, seguidos de la clase de accidente y la zona",
+    "tipo_grafico": "Barras horizontales ordenadas con escala secuencial",
+    "pregunta": "Modelo: interpretación",
+    "hallazgo": "La variable más importante es medio de transporte: al desordenarla, el F1 macro cae 0,077. Las variables del vehículo y del tipo de accidente pesan más que las del calendario (mes, fin de semana).",
+    "archivo": "reports/figuras/10_importancia_variables.png"
+  },
+  {
+    "nombre": "11_perfiles_riesgo",
+    "titulo": "Zona rural, objeto fijo y edad de 80+ multiplican por más de 3 la probabilidad de morir frente al perfil base",
+    "tipo_grafico": "Barras horizontales con perfil de referencia",
+    "pregunta": "Modelo: interpretación para el negocio",
+    "hallazgo": "Para un motociclista de 25-29 años que choca con un automóvil en la ciudad, la probabilidad estimada de morir es 15 %. El factor que más la eleva es 'si la víctima tiene 80 años o más' (×3,8); ser mujer la reduce a la mitad.",
+    "archivo": "reports/figuras/11_perfiles_riesgo.png"
+  }
+]
