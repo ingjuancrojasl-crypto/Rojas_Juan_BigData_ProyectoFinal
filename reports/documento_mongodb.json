@@ -1,0 +1,1494 @@
+{
+  "_id": "siniestros_transporte_colombia_2015_2024",
+  "metadata": {
+    "fecha_analisis": "2026-11-20T01:29:30",
+    "autores": [
+      "Juan Rojas"
+    ],
+    "proyecto": "Gravedad de los siniestros de transporte en Colombia (2015-2024)",
+    "curso": "Gerencia y almacenamiento en Big Data",
+    "pregunta_negocio": "¿Qué características de la víctima, del vehículo y del contexto se asocian con la gravedad de un siniestro de transporte (lesión leve, lesión grave o muerte), y cuáles son las causas más frecuentes en lesionados y fallecidos?",
+    "dataset": {
+      "fuente": "datos.gov.co — Medicina Legal (INMLCF) y Policía Nacional: 4 datasets unificados",
+      "url": "https://www.datos.gov.co",
+      "registros": 960623,
+      "columnas": 16,
+      "registros_crudos": 1896045,
+      "registros_medicina_legal": 415933,
+      "registros_policia": 544690,
+      "periodo": "2015-2024",
+      "fuentes": [
+        {
+          "nombre": "inml_lesiones",
+          "titulo": "Lesiones por eventos de transporte. Colombia, años 2015 a 2024. Cifras definitivas",
+          "entidad": "Instituto Nacional de Medicina Legal y Ciencias Forenses (INMLCF)",
+          "id_datos_gov": "ezhf-hscf",
+          "url": "https://www.datos.gov.co/d/ezhf-hscf",
+          "registros": 342796,
+          "columnas": 39,
+          "periodo": "2015-2024"
+        },
+        {
+          "nombre": "inml_muertes",
+          "titulo": "Muertes por eventos de transporte. Colombia, años 2015 a 2024. Cifras definitivas",
+          "entidad": "Instituto Nacional de Medicina Legal y Ciencias Forenses (INMLCF)",
+          "id_datos_gov": "s65h-7665",
+          "url": "https://www.datos.gov.co/d/s65h-7665",
+          "registros": 73403,
+          "columnas": 38,
+          "periodo": "2015-2024"
+        },
+        {
+          "nombre": "policia_lesiones",
+          "titulo": "Reporte Lesiones Personales y en Accidente de Tránsito Policía Nacional",
+          "entidad": "Dirección General de la Policía Nacional (DIPON)",
+          "id_datos_gov": "72sg-cybi",
+          "url": "https://www.datos.gov.co/d/72sg-cybi",
+          "registros": 1381416,
+          "columnas": 9,
+          "periodo": "2010-2026"
+        },
+        {
+          "nombre": "policia_homicidios_transito",
+          "titulo": "Homicidios accidente de tránsito Policía Nacional",
+          "entidad": "Dirección General de la Policía Nacional (DIPON)",
+          "id_datos_gov": "ha6j-pa2r",
+          "url": "https://www.datos.gov.co/d/ha6j-pa2r",
+          "registros": 98430,
+          "columnas": 9,
+          "periodo": "2010-2026"
+        }
+      ]
+    },
+    "almacenamiento": {
+      "formato": "Parquet (snappy)",
+      "procesamiento": "pandas",
+      "archivos": [
+        "data\\processed\\victimas_medicina_legal.parquet",
+        "data\\processed\\siniestros_unificado.parquet"
+      ]
+    }
+  },
+  "calidad_datos": {
+    "problemas_detectados": [
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Esquema",
+        "problema": "Columnas equivalentes con nombre distinto entre lesiones y muertes",
+        "registros_afectados": 5,
+        "tratamiento": "Normalización: renombrar a un esquema común en snake_case"
+      },
+      {
+        "fuente": "Policía lesiones",
+        "categoria": "Alcance",
+        "problema": "Filas que NO son de tránsito (lesiones personales, riñas, etc.)",
+        "registros_afectados": 926057,
+        "tratamiento": "Limpieza: filtrar conducta 'EN ACCIDENTE DE TRANSITO'"
+      },
+      {
+        "fuente": "Policía",
+        "categoria": "Alcance",
+        "problema": "Filas fuera del periodo común 2015-2024",
+        "registros_afectados": 514111,
+        "tratamiento": "Limpieza: filtrar al periodo común de las 4 fuentes"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Duplicados",
+        "problema": "Filas idénticas en las 38-39 columnas (sin contar el ID)",
+        "registros_afectados": 266,
+        "tratamiento": "Limpieza: eliminar (con tantas variables, coincidir en todo es un registro repetido)"
+      },
+      {
+        "fuente": "Policía homicidios",
+        "categoria": "Duplicados aparentes",
+        "problema": "Filas idénticas en las 9 columnas (2010-2026)",
+        "registros_afectados": 10959,
+        "tratamiento": "Se conservan: con solo 9 variables, dos víctimas distintas del mismo día y municipio se ven iguales"
+      },
+      {
+        "fuente": "Policía lesiones",
+        "categoria": "Granularidad",
+        "problema": "Filas de tránsito que agrupan varias víctimas (CANTIDAD > 1, hasta 60)",
+        "registros_afectados": 153360,
+        "tratamiento": "Normalización: expandir a una fila por víctima"
+      },
+      {
+        "fuente": "Policía",
+        "categoria": "Valores incoherentes",
+        "problema": "Medio = escopolamina, arma blanca, arma de fuego o contundente en un accidente de tránsito",
+        "registros_afectados": 1231,
+        "tratamiento": "Limpieza: medio -> 'Sin información' y bandera"
+      },
+      {
+        "fuente": "Policía",
+        "categoria": "Nulos",
+        "problema": "Registros sin género (vacío o 'NO REPORTA')",
+        "registros_afectados": 2459,
+        "tratamiento": "Limpieza: 'Sin información'"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Registro desigual",
+        "problema": "Sin dato de hora del hecho: 6 % en lesiones vs 50 % en muertes",
+        "registros_afectados": 57626,
+        "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Registro desigual",
+        "problema": "Sin dato de causa (circunstancia): 10 % en lesiones vs 66 % en muertes",
+        "registros_afectados": 81482,
+        "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Registro desigual",
+        "problema": "Sin dato de actividad durante el hecho: 1 % en lesiones vs 33 % en muertes",
+        "registros_afectados": 26444,
+        "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Registro desigual",
+        "problema": "Sin dato de escolaridad: 2 % en lesiones vs 20 % en muertes",
+        "registros_afectados": 20792,
+        "tratamiento": "Modelo: no usar como predictor (fuga de información); causas solo con registros con dato"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'mes_nombre': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 12,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'dia_semana': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 7,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'escenario': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 20,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'zona': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 1,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'clase_accidente': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 7,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'medio_transporte': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 10,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'objeto_colision': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 17,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'circunstancia': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 65,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Texto inconsistente",
+        "problema": "'condicion_victima': valores que solo cambian en mayúsculas, tildes o espacios",
+        "registros_afectados": 1,
+        "tratamiento": "Normalización: etiqueta canónica"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Cambio de catálogo",
+        "problema": "'Choque con otro vehículo' pasa a llamarse 'Choque' desde 2019",
+        "registros_afectados": 246282,
+        "tratamiento": "Normalización: unificar en 'Choque'"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Catálogo extenso",
+        "problema": "Causas distintas (137 en lesiones, 65 en muertes, con variantes)",
+        "registros_afectados": 145,
+        "tratamiento": "Enriquecimiento: agrupar en 9 categorías de causa comparables"
+      },
+      {
+        "fuente": "Medicina Legal lesiones",
+        "categoria": "Cambio de catálogo",
+        "problema": "Días de incapacidad con 9 etiquetas distintas para 4 conceptos (p. ej. 'Cero', 'Cero días', 'Sin días de incapacidad')",
+        "registros_afectados": 9,
+        "tratamiento": "Enriquecimiento: gravedad leve (0-30 días) / grave (> 30 días)"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Formato de códigos",
+        "problema": "Códigos DANE de municipio sin el cero inicial (4 dígitos)",
+        "registros_afectados": 66012,
+        "tratamiento": "Normalización: completar a 5 dígitos"
+      },
+      {
+        "fuente": "Policía",
+        "categoria": "Formato de códigos",
+        "problema": "Código DANE de 8 dígitos y municipio con sufijo '(CT)'",
+        "registros_afectados": 559868,
+        "tratamiento": "Normalización: 5 primeros dígitos y nombre oficial DANE"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "categoria": "Columnas sin aporte",
+        "problema": "Columnas constantes o con > 60 % sin dato",
+        "registros_afectados": 13,
+        "tratamiento": "Limpieza: excluir de la base analítica (motivo documentado)"
+      }
+    ],
+    "total_problemas": 27,
+    "registros_eliminados": 1128758,
+    "detalle_eliminados": [
+      {
+        "motivo": "Registros duplicados (Medicina Legal)",
+        "registros": 266
+      },
+      {
+        "motivo": "Denuncias que no son de tránsito (Policía)",
+        "registros": 926057
+      },
+      {
+        "motivo": "Registros fuera de 2015-2024 (Policía)",
+        "registros": 202409
+      },
+      {
+        "motivo": "Municipios sin código DANE válido (Policía)",
+        "registros": 26
+      }
+    ],
+    "pasos_etl": [
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Limpieza",
+        "etapa": "Esquema común (columnas)",
+        "antes": 77,
+        "despues": 41,
+        "diferencia": -36,
+        "detalle": "Renombrado a snake_case; 5 pares de columnas equivalentes con nombre distinto"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Limpieza",
+        "etapa": "Eliminar duplicados (sin ID)",
+        "antes": 416199,
+        "despues": 415933,
+        "diferencia": -266,
+        "detalle": ""
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Limpieza",
+        "etapa": "Validar periodo",
+        "antes": 415933,
+        "despues": 415933,
+        "diferencia": 0,
+        "detalle": ""
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Limpieza",
+        "etapa": "Excluir columnas constantes o casi vacías (columnas)",
+        "antes": 42,
+        "despues": 29,
+        "diferencia": -13,
+        "detalle": "Ver COLUMNAS_DESCARTADAS_INML"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Limpieza",
+        "etapa": "Celdas vacías -> 'Sin información'",
+        "antes": 73363,
+        "despues": 0,
+        "diferencia": -73363,
+        "detalle": ""
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Normalización",
+        "etapa": "Unificar escritura en 23 columnas de texto (valores únicos)",
+        "antes": 1686,
+        "despues": 1485,
+        "diferencia": -201,
+        "detalle": "Mayúsculas, tildes, espacios, paréntesis"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Normalización",
+        "etapa": "Clase de accidente: catálogos por año",
+        "antes": 17,
+        "despues": 13,
+        "diferencia": -4,
+        "detalle": "'Choque con otro vehículo' (2015-2018) = 'Choque' (2019-2024)"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Normalización",
+        "etapa": "Formato de rango horario",
+        "antes": 19,
+        "despues": 9,
+        "diferencia": -10,
+        "detalle": "'18:00 a 20:59', '(18:00 a  20:59)' -> '(18:00 a 20:59)'"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Normalización",
+        "etapa": "Zona del hecho",
+        "antes": 4,
+        "despues": 4,
+        "diferencia": 0,
+        "detalle": ""
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Normalización",
+        "etapa": "Códigos DANE a 5 y 2 dígitos",
+        "antes": 65973,
+        "despues": 0,
+        "diferencia": -65973,
+        "detalle": ""
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Normalización",
+        "etapa": "Tipos optimizados (MB en memoria)",
+        "antes": 264,
+        "despues": 15,
+        "diferencia": -249,
+        "detalle": ""
+      },
+      {
+        "fuente": "Policía lesiones",
+        "tecnica": "Limpieza",
+        "etapa": "Filtrar conducta de tránsito",
+        "antes": 1381416,
+        "despues": 455359,
+        "diferencia": -926057,
+        "detalle": "Se excluyen lesiones personales (art. 111, 119...) y 8.651 'ART. 120' sin mención de tránsito"
+      },
+      {
+        "fuente": "Policía",
+        "tecnica": "Limpieza",
+        "etapa": "Filtrar periodo 2015-2024",
+        "antes": 553789,
+        "despues": 351380,
+        "diferencia": -202409,
+        "detalle": ""
+      },
+      {
+        "fuente": "Policía",
+        "tecnica": "Limpieza",
+        "etapa": "Marcar medio incoherente con tránsito",
+        "antes": 0,
+        "despues": 1228,
+        "diferencia": 1228,
+        "detalle": "Escopolamina, armas, contundentes -> medio 'Sin información'"
+      },
+      {
+        "fuente": "Policía",
+        "tecnica": "Limpieza",
+        "etapa": "Género/edad vacíos -> 'Sin información'",
+        "antes": 1103,
+        "despues": 0,
+        "diferencia": -1103,
+        "detalle": ""
+      },
+      {
+        "fuente": "Policía",
+        "tecnica": "Normalización",
+        "etapa": "Municipio y departamento con nombre oficial DANE (vía código)",
+        "antes": 351380,
+        "despues": 351354,
+        "diferencia": -26,
+        "detalle": "26 filas con municipio sin víctimas en Medicina Legal: se limpia el nombre de la Policía"
+      },
+      {
+        "fuente": "Policía",
+        "tecnica": "Normalización",
+        "etapa": "Expandir CANTIDAD: una fila por víctima",
+        "antes": 351380,
+        "despues": 544690,
+        "diferencia": 193310,
+        "detalle": "Misma unidad de análisis que Medicina Legal"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Enriquecimiento",
+        "etapa": "Gravedad (leve/grave/muerte) con dato",
+        "antes": 415933,
+        "despues": 398950,
+        "diferencia": -16983,
+        "detalle": "Leve: 0-30 días de incapacidad; grave: > 30 días"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Enriquecimiento",
+        "etapa": "Causas: valores distintos -> categorías",
+        "antes": 80,
+        "despues": 11,
+        "diferencia": -69,
+        "detalle": "Catálogo aplicado en data/reference/catalogo_causas.csv"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Enriquecimiento",
+        "etapa": "Medio y objeto de colisión agrupados (categorías)",
+        "antes": 105,
+        "despues": 16,
+        "diferencia": -89,
+        "detalle": ""
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Enriquecimiento",
+        "etapa": "Cruce con regiones naturales (filas con región)",
+        "antes": 415933,
+        "despues": 415857,
+        "diferencia": -76,
+        "detalle": ""
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Enriquecimiento",
+        "etapa": "Contexto policial del municipio (año anterior)",
+        "antes": 415933,
+        "despues": 413204,
+        "diferencia": -2729,
+        "detalle": "Filas cuyo municipio tuvo víctimas policiales el año previo"
+      },
+      {
+        "fuente": "Medicina Legal",
+        "tecnica": "Enriquecimiento",
+        "etapa": "Columnas de la base analítica",
+        "antes": 30,
+        "despues": 44,
+        "diferencia": 14,
+        "detalle": ""
+      }
+    ],
+    "tecnicas_aplicadas": [
+      "Enriquecimiento",
+      "Limpieza",
+      "Normalización"
+    ]
+  },
+  "estadisticas_descriptivas": {
+    "victimas_por_fuente_y_desenlace": [
+      {
+        "fuente": "Medicina Legal",
+        "desenlace": "Lesión",
+        "victimas": 342570
+      },
+      {
+        "fuente": "Medicina Legal",
+        "desenlace": "Muerte",
+        "victimas": 73363
+      },
+      {
+        "fuente": "Policía Nacional",
+        "desenlace": "Lesión",
+        "victimas": 482091
+      },
+      {
+        "fuente": "Policía Nacional",
+        "desenlace": "Muerte",
+        "victimas": 62599
+      }
+    ],
+    "victimas_por_anio": [
+      {
+        "anio": 2015,
+        "Medicina Legal - Lesión": 45718,
+        "Medicina Legal - Muerte": 6880,
+        "Policía Nacional - Lesión": 42588,
+        "Policía Nacional - Muerte": 5344
+      },
+      {
+        "anio": 2016,
+        "Medicina Legal - Lesión": 45231,
+        "Medicina Legal - Muerte": 7260,
+        "Policía Nacional - Lesión": 77037,
+        "Policía Nacional - Muerte": 5609
+      },
+      {
+        "anio": 2017,
+        "Medicina Legal - Lesión": 40094,
+        "Medicina Legal - Muerte": 6752,
+        "Policía Nacional - Lesión": 67281,
+        "Policía Nacional - Muerte": 5261
+      },
+      {
+        "anio": 2018,
+        "Medicina Legal - Lesión": 39518,
+        "Medicina Legal - Muerte": 6876,
+        "Policía Nacional - Lesión": 48999,
+        "Policía Nacional - Muerte": 6017
+      },
+      {
+        "anio": 2019,
+        "Medicina Legal - Lesión": 36819,
+        "Medicina Legal - Muerte": 6891,
+        "Policía Nacional - Lesión": 40150,
+        "Policía Nacional - Muerte": 6053
+      },
+      {
+        "anio": 2020,
+        "Medicina Legal - Lesión": 14456,
+        "Medicina Legal - Muerte": 5668,
+        "Policía Nacional - Lesión": 27481,
+        "Policía Nacional - Muerte": 5068
+      },
+      {
+        "anio": 2021,
+        "Medicina Legal - Lesión": 24364,
+        "Medicina Legal - Muerte": 7474,
+        "Policía Nacional - Lesión": 34114,
+        "Policía Nacional - Muerte": 6998
+      },
+      {
+        "anio": 2022,
+        "Medicina Legal - Lesión": 32222,
+        "Medicina Legal - Muerte": 8504,
+        "Policía Nacional - Lesión": 45760,
+        "Policía Nacional - Muerte": 7539
+      },
+      {
+        "anio": 2023,
+        "Medicina Legal - Lesión": 33107,
+        "Medicina Legal - Muerte": 8580,
+        "Policía Nacional - Lesión": 51337,
+        "Policía Nacional - Muerte": 7584
+      },
+      {
+        "anio": 2024,
+        "Medicina Legal - Lesión": 31041,
+        "Medicina Legal - Muerte": 8478,
+        "Policía Nacional - Lesión": 47344,
+        "Policía Nacional - Muerte": 7126
+      }
+    ],
+    "gravedad_medicina_legal_pct": {
+      "Lesión leve": 44.8,
+      "Lesión grave": 36.8,
+      "Muerte": 18.4
+    },
+    "letalidad_general_pct": 18.4,
+    "sexo_pct_por_desenlace": {
+      "Lesión": {
+        "Hombre": 61.9,
+        "Mujer": 38.1
+      },
+      "Muerte": {
+        "Hombre": 81.9,
+        "Mujer": 18.1,
+        "Sin información": 0.0
+      }
+    },
+    "medio_transporte_pct_por_desenlace": {
+      "Lesión": {
+        "Motocicleta": 57.8,
+        "Peatón (sin vehículo)": 16.2,
+        "Vehículo automotor": 16.0,
+        "Bicicleta y micromovilidad": 7.0,
+        "Sin información": 2.9,
+        "Otros medios": 0.1
+      },
+      "Muerte": {
+        "Motocicleta": 55.7,
+        "Peatón (sin vehículo)": 23.7,
+        "Vehículo automotor": 12.0,
+        "Bicicleta y micromovilidad": 5.9,
+        "Sin información": 2.1,
+        "Otros medios": 0.6
+      }
+    },
+    "dias_incapacidad_lesiones_pct": {
+      "1 a 30": 50.2,
+      "31 a 90": 36.2,
+      "Más de 90": 6.7,
+      "Cero días y Sin información": 3.1,
+      "Sin información": 1.9,
+      "Cero días": 1.4,
+      "Sin días de incapacidad": 0.6,
+      "Cero": 0.0
+    },
+    "victimas_por_grupo_edad": {
+      "Adultos (18 y más)": 379329,
+      "Adolescentes (12-17)": 21058,
+      "Menores (0-11)": 15490,
+      "Sin información": 56
+    },
+    "departamentos_con_mas_muertes": [
+      {
+        "departamento": "Antioquia",
+        "muertes": 9740
+      },
+      {
+        "departamento": "Valle del Cauca",
+        "muertes": 9051
+      },
+      {
+        "departamento": "Cundinamarca",
+        "muertes": 5642
+      },
+      {
+        "departamento": "Bogotá, D.C.",
+        "muertes": 4441
+      },
+      {
+        "departamento": "Santander",
+        "muertes": 3554
+      },
+      {
+        "departamento": "Tolima",
+        "muertes": 2941
+      },
+      {
+        "departamento": "Cesar",
+        "muertes": 2729
+      },
+      {
+        "departamento": "Huila",
+        "muertes": 2680
+      },
+      {
+        "departamento": "Meta",
+        "muertes": 2593
+      },
+      {
+        "departamento": "Córdoba",
+        "muertes": 2413
+      }
+    ]
+  },
+  "agregaciones": [
+    {
+      "nombre": "muertes_por_region_y_fuente",
+      "operacion_olap": "Roll-up (departamento -> región)",
+      "dimensiones": [
+        "region",
+        "fuente"
+      ],
+      "medida": "victimas (muertes)",
+      "resultado": [
+        {
+          "region": "Amazonía",
+          "Medicina Legal": 1753.0,
+          "Policía Nacional": 1035.0
+        },
+        {
+          "region": "Andina",
+          "Medicina Legal": 38531.0,
+          "Policía Nacional": 33482.0
+        },
+        {
+          "region": "Caribe",
+          "Medicina Legal": 14135.0,
+          "Policía Nacional": 13194.0
+        },
+        {
+          "region": "Insular",
+          "Medicina Legal": 160.0,
+          "Policía Nacional": 143.0
+        },
+        {
+          "region": "Orinoquía",
+          "Medicina Legal": 4848.0,
+          "Policía Nacional": 3379.0
+        },
+        {
+          "region": "Pacífica",
+          "Medicina Legal": 13918.0,
+          "Policía Nacional": 11366.0
+        },
+        {
+          "region": "Sin información",
+          "Medicina Legal": 18.0,
+          "Policía Nacional": null
+        }
+      ]
+    },
+    {
+      "nombre": "letalidad_por_medio_transporte",
+      "operacion_olap": "Slice (Medicina Legal) + agregación",
+      "dimensiones": [
+        "medio_grupo"
+      ],
+      "medida": "% de víctimas que fallecen",
+      "resultado": [
+        {
+          "medio_grupo": "Bicicleta y micromovilidad",
+          "letalidad_pct": 15.8
+        },
+        {
+          "medio_grupo": "Motocicleta",
+          "letalidad_pct": 17.6
+        },
+        {
+          "medio_grupo": "Otros medios",
+          "letalidad_pct": 63.7
+        },
+        {
+          "medio_grupo": "Peatón (sin vehículo)",
+          "letalidad_pct": 24.7
+        },
+        {
+          "medio_grupo": "Vehículo automotor",
+          "letalidad_pct": 15.0
+        }
+      ]
+    },
+    {
+      "nombre": "letalidad_por_zona",
+      "operacion_olap": "Slice + agregación",
+      "dimensiones": [
+        "zona"
+      ],
+      "medida": "% de víctimas que fallecen",
+      "resultado": [
+        {
+          "zona": "Cabecera municipal",
+          "letalidad_pct": 13.2
+        },
+        {
+          "zona": "Centro poblado",
+          "letalidad_pct": 36.9
+        },
+        {
+          "zona": "Parte rural (vereda y campo)",
+          "letalidad_pct": 51.6
+        }
+      ]
+    },
+    {
+      "nombre": "victimas_por_dia_semana",
+      "operacion_olap": "Pivot (día × desenlace) sobre el cubo temporal",
+      "dimensiones": [
+        "dia_semana",
+        "desenlace"
+      ],
+      "medida": "victimas (Policía Nacional)",
+      "resultado": [
+        {
+          "dia_semana": "Lunes",
+          "Lesión": 67548,
+          "Muerte": 8949
+        },
+        {
+          "dia_semana": "Martes",
+          "Lesión": 63671,
+          "Muerte": 7323
+        },
+        {
+          "dia_semana": "Miércoles",
+          "Lesión": 62511,
+          "Muerte": 6893
+        },
+        {
+          "dia_semana": "Jueves",
+          "Lesión": 62965,
+          "Muerte": 7156
+        },
+        {
+          "dia_semana": "Viernes",
+          "Lesión": 67528,
+          "Muerte": 7971
+        },
+        {
+          "dia_semana": "Sábado",
+          "Lesión": 77745,
+          "Muerte": 10750
+        },
+        {
+          "dia_semana": "Domingo",
+          "Lesión": 80123,
+          "Muerte": 13557
+        }
+      ]
+    },
+    {
+      "nombre": "top5_causas_por_desenlace",
+      "operacion_olap": "Dice (causas con dato) + ranking",
+      "dimensiones": [
+        "desenlace",
+        "causa_categoria"
+      ],
+      "medida": "victimas",
+      "resultado": [
+        {
+          "desenlace": "Lesión",
+          "causa_categoria": "Maniobras peligrosas",
+          "victimas": 67676
+        },
+        {
+          "desenlace": "Lesión",
+          "causa_categoria": "Desobedecer señales y normas",
+          "victimas": 62520
+        },
+        {
+          "desenlace": "Lesión",
+          "causa_categoria": "Exceso de velocidad",
+          "victimas": 57356
+        },
+        {
+          "desenlace": "Lesión",
+          "causa_categoria": "Otras / no especificadas",
+          "victimas": 47036
+        },
+        {
+          "desenlace": "Lesión",
+          "causa_categoria": "Imprudencia del peatón",
+          "victimas": 35863
+        },
+        {
+          "desenlace": "Muerte",
+          "causa_categoria": "Desobedecer señales y normas",
+          "victimas": 7743
+        },
+        {
+          "desenlace": "Muerte",
+          "causa_categoria": "Exceso de velocidad",
+          "victimas": 7722
+        },
+        {
+          "desenlace": "Muerte",
+          "causa_categoria": "Otras / no especificadas",
+          "victimas": 5614
+        },
+        {
+          "desenlace": "Muerte",
+          "causa_categoria": "Embriaguez o consumo de sustancias",
+          "victimas": 1488
+        },
+        {
+          "desenlace": "Muerte",
+          "causa_categoria": "Fallas mecánicas o del vehículo",
+          "victimas": 1025
+        }
+      ]
+    }
+  ],
+  "modelo": {
+    "tarea": "Clasificación multiclase de la gravedad del siniestro",
+    "algoritmo": "Regresión logística",
+    "clases": [
+      "Lesión leve",
+      "Lesión grave",
+      "Muerte"
+    ],
+    "validacion": {
+      "tipo": "Temporal",
+      "entrenamiento": [
+        2015,
+        2022
+      ],
+      "prueba": [
+        2023,
+        2024
+      ],
+      "registros_entrenamiento": 317744,
+      "registros_prueba": 81206
+    },
+    "metricas": {
+      "accuracy": 0.5073,
+      "precision_macro": 0.5077,
+      "recall_macro": 0.5369,
+      "f1_macro": 0.5091,
+      "f1_Lesión leve": 0.5343,
+      "f1_Lesión grave": 0.4537,
+      "f1_Muerte": 0.5392,
+      "recall_Lesión leve": 0.4805,
+      "recall_Lesión grave": 0.427,
+      "recall_Muerte": 0.7034,
+      "precision_Lesión leve": 0.6018,
+      "precision_Lesión grave": 0.484,
+      "precision_Muerte": 0.4372,
+      "segundos_entrenamiento": 23.4
+    },
+    "linea_base": {
+      "Línea base: clase mayoritaria": {
+        "accuracy": 0.4159,
+        "precision_macro": 0.1386,
+        "recall_macro": 0.3333,
+        "f1_macro": 0.1958,
+        "f1_Lesión leve": 0.5874,
+        "f1_Lesión grave": 0.0,
+        "f1_Muerte": 0.0,
+        "recall_Lesión leve": 1.0,
+        "recall_Lesión grave": 0.0,
+        "recall_Muerte": 0.0,
+        "precision_Lesión leve": 0.4159,
+        "precision_Lesión grave": 0.0,
+        "precision_Muerte": 0.0,
+        "segundos_entrenamiento": 0.6
+      },
+      "Línea base: estratificada": {
+        "accuracy": 0.3675,
+        "precision_macro": 0.3373,
+        "recall_macro": 0.3371,
+        "f1_macro": 0.3363,
+        "f1_Lesión leve": 0.439,
+        "f1_Lesión grave": 0.3719,
+        "f1_Muerte": 0.1982,
+        "recall_Lesión leve": 0.4611,
+        "recall_Lesión grave": 0.3673,
+        "recall_Muerte": 0.1827,
+        "precision_Lesión leve": 0.4189,
+        "precision_Lesión grave": 0.3765,
+        "precision_Muerte": 0.2166,
+        "segundos_entrenamiento": 0.4
+      }
+    },
+    "comparacion_modelos": [
+      {
+        "modelo": "Línea base: clase mayoritaria",
+        "accuracy": 0.4159,
+        "precision_macro": 0.1386,
+        "recall_macro": 0.3333,
+        "f1_macro": 0.1958,
+        "f1_Lesión leve": 0.5874,
+        "f1_Lesión grave": 0.0,
+        "f1_Muerte": 0.0,
+        "recall_Lesión leve": 1.0,
+        "recall_Lesión grave": 0.0,
+        "recall_Muerte": 0.0,
+        "precision_Lesión leve": 0.4159,
+        "precision_Lesión grave": 0.0,
+        "precision_Muerte": 0.0,
+        "segundos_entrenamiento": 0.6
+      },
+      {
+        "modelo": "Línea base: estratificada",
+        "accuracy": 0.3675,
+        "precision_macro": 0.3373,
+        "recall_macro": 0.3371,
+        "f1_macro": 0.3363,
+        "f1_Lesión leve": 0.439,
+        "f1_Lesión grave": 0.3719,
+        "f1_Muerte": 0.1982,
+        "recall_Lesión leve": 0.4611,
+        "recall_Lesión grave": 0.3673,
+        "recall_Muerte": 0.1827,
+        "precision_Lesión leve": 0.4189,
+        "precision_Lesión grave": 0.3765,
+        "precision_Muerte": 0.2166,
+        "segundos_entrenamiento": 0.4
+      },
+      {
+        "modelo": "Regresión logística",
+        "accuracy": 0.5073,
+        "precision_macro": 0.5077,
+        "recall_macro": 0.5369,
+        "f1_macro": 0.5091,
+        "f1_Lesión leve": 0.5343,
+        "f1_Lesión grave": 0.4537,
+        "f1_Muerte": 0.5392,
+        "recall_Lesión leve": 0.4805,
+        "recall_Lesión grave": 0.427,
+        "recall_Muerte": 0.7034,
+        "precision_Lesión leve": 0.6018,
+        "precision_Lesión grave": 0.484,
+        "precision_Muerte": 0.4372,
+        "segundos_entrenamiento": 23.4
+      },
+      {
+        "modelo": "Gradient Boosting",
+        "accuracy": 0.5009,
+        "precision_macro": 0.5083,
+        "recall_macro": 0.5347,
+        "f1_macro": 0.5033,
+        "f1_Lesión leve": 0.5105,
+        "f1_Lesión grave": 0.468,
+        "f1_Muerte": 0.5315,
+        "recall_Lesión leve": 0.4332,
+        "recall_Lesión grave": 0.456,
+        "recall_Muerte": 0.7151,
+        "precision_Lesión leve": 0.6215,
+        "precision_Lesión grave": 0.4806,
+        "precision_Muerte": 0.4229,
+        "segundos_entrenamiento": 50.9
+      }
+    ],
+    "criterio_exito": {
+      "definicion": "F1 macro ≥ mejor línea base + 0,10 y recall de Muerte ≥ 0,70",
+      "f1_macro": 0.5090907877907286,
+      "recall_Muerte": 0.7033649900340017,
+      "mejora_vs_linea_base": 0.17274570624180796,
+      "cumple_mejora_F1": true,
+      "cumple_recall_muerte": true,
+      "cumple_criterio": true
+    },
+    "matriz_confusion": {
+      "etiquetas": [
+        "Lesión leve",
+        "Lesión grave",
+        "Muerte"
+      ],
+      "valores": [
+        [
+          16227,
+          10387,
+          7157
+        ],
+        [
+          9121,
+          12970,
+          8286
+        ],
+        [
+          1617,
+          3443,
+          11998
+        ]
+      ]
+    },
+    "variables_importantes": [
+      {
+        "variable": "medio_grupo",
+        "variable_negocio": "Medio de transporte",
+        "importancia": 0.07684,
+        "desviacion": 0.00051
+      },
+      {
+        "variable": "objeto_grupo",
+        "variable_negocio": "Objeto de colisión",
+        "importancia": 0.07653,
+        "desviacion": 0.0024
+      },
+      {
+        "variable": "clase_accidente",
+        "variable_negocio": "Clase de accidente",
+        "importancia": 0.05175,
+        "desviacion": 0.00168
+      },
+      {
+        "variable": "zona",
+        "variable_negocio": "Zona (urbana o rural)",
+        "importancia": 0.03292,
+        "desviacion": 0.00132
+      },
+      {
+        "variable": "departamento",
+        "variable_negocio": "Departamento",
+        "importancia": 0.02516,
+        "desviacion": 0.00099
+      },
+      {
+        "variable": "grupo_edad_quinquenal",
+        "variable_negocio": "Edad de la víctima",
+        "importancia": 0.02497,
+        "desviacion": 0.00129
+      },
+      {
+        "variable": "lesionados_policia_anio_ant",
+        "variable_negocio": "Lesionados en el municipio (año anterior)",
+        "importancia": 0.02209,
+        "desviacion": 0.00065
+      },
+      {
+        "variable": "condicion_victima",
+        "variable_negocio": "Condición (conductor, pasajero, peatón)",
+        "importancia": 0.02067,
+        "desviacion": 0.00046
+      },
+      {
+        "variable": "sexo",
+        "variable_negocio": "Sexo de la víctima",
+        "importancia": 0.01603,
+        "desviacion": 0.00131
+      },
+      {
+        "variable": "muertes_policia_anio_ant",
+        "variable_negocio": "Muertes en el municipio (año anterior)",
+        "importancia": 0.00987,
+        "desviacion": 0.00258
+      },
+      {
+        "variable": "dia_semana",
+        "variable_negocio": "Día de la semana",
+        "importancia": 0.00692,
+        "desviacion": 0.00115
+      },
+      {
+        "variable": "servicio_vehiculo",
+        "variable_negocio": "Servicio del vehículo",
+        "importancia": 0.00565,
+        "desviacion": 0.00031
+      },
+      {
+        "variable": "fin_de_semana",
+        "variable_negocio": "Fin de semana",
+        "importancia": 0.00206,
+        "desviacion": 0.00118
+      },
+      {
+        "variable": "mes",
+        "variable_negocio": "Mes",
+        "importancia": 0.00096,
+        "desviacion": 0.00044
+      }
+    ],
+    "variables_usadas": [
+      "sexo",
+      "grupo_edad_quinquenal",
+      "condicion_victima",
+      "medio_grupo",
+      "servicio_vehiculo",
+      "clase_accidente",
+      "objeto_grupo",
+      "zona",
+      "dia_semana",
+      "departamento",
+      "mes",
+      "fin_de_semana",
+      "lesionados_policia_anio_ant",
+      "muertes_policia_anio_ant"
+    ],
+    "variables_excluidas_por_fuga": {
+      "dias_incapacidad": "Define la clase (lesión leve/grave): usarla sería copiar la respuesta",
+      "mecanismo_causal, diagnostico_topografico": "Se conocen después del hecho (resultado del examen forense)",
+      "rango_hora / franja_horaria": "Sin dato en el 50 % de las muertes frente al 6 % de las lesiones",
+      "causa (circunstancia)": "Sin dato en el 66 % de las muertes frente al 10 % de las lesiones",
+      "actividad, escolaridad, estado civil, pertenencia étnica, servicio del objeto": "Faltan entre 14 y 35 puntos porcentuales más en las muertes",
+      "escenario": "Se codifica distinto en cada archivo ('Vía pública' en muertes, 'Calle' en lesiones)",
+      "anio": "Se usa para dividir entrenamiento y prueba; como predictor no generaliza a años futuros"
+    },
+    "perfiles_riesgo": [
+      {
+        "perfil": "Perfil base: motociclista de 25-29 años, choque con automóvil en la ciudad",
+        "Lesión leve": 0.3226,
+        "Lesión grave": 0.5249,
+        "Muerte": 0.1525,
+        "veces_riesgo_muerte_vs_base": 1.0
+      },
+      {
+        "perfil": "… si choca contra un objeto fijo",
+        "Lesión leve": 0.1535,
+        "Lesión grave": 0.3488,
+        "Muerte": 0.4977,
+        "veces_riesgo_muerte_vs_base": 3.263
+      },
+      {
+        "perfil": "… si el choque ocurre en zona rural",
+        "Lesión leve": 0.1315,
+        "Lesión grave": 0.3063,
+        "Muerte": 0.5622,
+        "veces_riesgo_muerte_vs_base": 3.6858
+      },
+      {
+        "perfil": "… si choca con un vehículo de carga pesada",
+        "Lesión leve": 0.2394,
+        "Lesión grave": 0.5091,
+        "Muerte": 0.2515,
+        "veces_riesgo_muerte_vs_base": 1.6488
+      },
+      {
+        "perfil": "… si es un peatón atropellado",
+        "Lesión leve": 0.2593,
+        "Lesión grave": 0.4338,
+        "Muerte": 0.307,
+        "veces_riesgo_muerte_vs_base": 2.0125
+      },
+      {
+        "perfil": "… si la víctima tiene 80 años o más",
+        "Lesión leve": 0.1102,
+        "Lesión grave": 0.3177,
+        "Muerte": 0.5721,
+        "veces_riesgo_muerte_vs_base": 3.7504
+      },
+      {
+        "perfil": "… si ocurre un domingo",
+        "Lesión leve": 0.3002,
+        "Lesión grave": 0.4786,
+        "Muerte": 0.2212,
+        "veces_riesgo_muerte_vs_base": 1.4501
+      },
+      {
+        "perfil": "… si es mujer",
+        "Lesión leve": 0.4331,
+        "Lesión grave": 0.493,
+        "Muerte": 0.0738,
+        "veces_riesgo_muerte_vs_base": 0.4841
+      },
+      {
+        "perfil": "Peor combinación: peatón de 80+ atropellado por carga pesada en zona rural",
+        "Lesión leve": 0.0037,
+        "Lesión grave": 0.0207,
+        "Muerte": 0.9755,
+        "veces_riesgo_muerte_vs_base": 6.3957
+      }
+    ],
+    "archivo": "models\\modelo_gravedad.joblib",
+    "version_sklearn": "1.9.1"
+  },
+  "insights": [
+    {
+      "id": 1,
+      "tema": "Tendencia temporal",
+      "titulo": "Las muertes crecen 25 % entre 2015 y 2023, mientras las lesiones no recuperan el nivel previo a la pandemia",
+      "descripcion": "Medicina Legal pasó de 6.880 muertes en 2015 a 8.580 en 2023. Las lesiones cayeron 61 % en 2020 y en 2024 siguen 32 % por debajo de 2015.",
+      "metrica": {
+        "muertes_inicio": 6880,
+        "muertes_maximo": 8580,
+        "anio_maximo": 2023
+      },
+      "visualizacion": "01_evolucion_anual"
+    },
+    {
+      "id": 2,
+      "tema": "Medio de transporte",
+      "titulo": "La motocicleta concentra el 56 % de las muertes y el 58 % de las lesiones",
+      "descripcion": "Los peatones son el 24 % de los fallecidos y tienen la mayor letalidad entre los usuarios frecuentes de la vía (25 % de los peatones víctimas muere, frente a 18 % de los motociclistas).",
+      "metrica": {
+        "pct_muertes_moto": 55.7,
+        "letalidad_peaton_pct": 24.7
+      },
+      "visualizacion": "02_distribucion_medio"
+    },
+    {
+      "id": 3,
+      "tema": "Zona y región",
+      "titulo": "En zona rural muere el 52 % de las víctimas, frente al 13 % en la cabecera municipal",
+      "descripcion": "Un siniestro rural es 3,9 veces más letal que uno urbano: velocidades más altas y atención médica más lejana. El patrón se repite en todas las regiones naturales.",
+      "metrica": {
+        "letalidad_rural_pct": 51.6,
+        "letalidad_cabecera_pct": 13.2
+      },
+      "visualizacion": "07_letalidad_region_zona"
+    },
+    {
+      "id": 4,
+      "tema": "Objeto de colisión",
+      "titulo": "Chocar contra un objeto fijo es mortal en el 68 % de los casos",
+      "descripcion": "Es la colisión más letal (postes, árboles, muros), muy por encima del choque con automóvil (8 %) y con vehículo de carga pesada (21 %).",
+      "metrica": {
+        "letalidad_objeto_fijo_pct": 67.5
+      },
+      "visualizacion": "05_letalidad_objeto"
+    },
+    {
+      "id": 5,
+      "tema": "Perfil de la víctima",
+      "titulo": "Las víctimas de 60 años o más mueren en el 31 % de los casos, frente al 17 % del resto",
+      "descripcion": "El modelo confirma el efecto de la edad: con todo lo demás igual, tener 80 años o más multiplica por 3,8 la probabilidad de muerte. Los hombres son el 82 % de los fallecidos.",
+      "metrica": {
+        "letalidad_60_mas_pct": 31.0,
+        "veces_riesgo_80_mas": 3.75
+      },
+      "visualizacion": "04_gravedad_por_edad"
+    },
+    {
+      "id": 6,
+      "tema": "Causas",
+      "titulo": "Exceso de velocidad y desobedecer las normas explican el 62 % de las muertes con causa registrada",
+      "descripcion": "En los lesionados predominan las maniobras peligrosas (22 %) y la imprudencia del peatón (12 %). Advertencia: el 66 % de las muertes no tiene causa registrada.",
+      "metrica": {
+        "pct_sin_causa_en_muertes": 65.8
+      },
+      "visualizacion": "06_causas"
+    },
+    {
+      "id": 7,
+      "tema": "Calidad de las fuentes",
+      "titulo": "La Policía registra entre 0,77 y 0,94 muertes por cada muerte forense",
+      "descripcion": "Ninguna fuente por sí sola dimensiona el fenómeno: no toda muerte llega a denuncia penal y no todo lesionado pasa por examen forense. Además, la hora y la causa faltan en la mitad o más de las muertes del INMLCF.",
+      "metrica": {
+        "razon_min": 0.77,
+        "razon_max": 0.94
+      },
+      "visualizacion": "08_cobertura_fuentes"
+    },
+    {
+      "id": 8,
+      "tema": "Modelo",
+      "titulo": "El modelo detecta 70 de cada 100 muertes y supera la línea base en 17 puntos de F1 macro",
+      "descripcion": "Regresión logística con validación temporal (prueba 2023-2024). Las variables más influyentes son medio de transporte, objeto de colisión, clase de accidente. Separar lesión leve de grave es lo más difícil.",
+      "metrica": {
+        "f1_macro": 0.5091,
+        "recall_muerte": 0.7034,
+        "f1_linea_base": 0.3363
+      },
+      "visualizacion": "09_matriz_confusion"
+    }
+  ],
+  "visualizaciones_generadas": [
+    {
+      "nombre": "01_evolucion_anual",
+      "titulo": "Las muertes en siniestros viales llegan a su máximo en 2023 (+25 % frente a 2015), mientras las lesiones forenses siguen 32 % por debajo",
+      "tipo_grafico": "Líneas (paneles)",
+      "pregunta": "P1: evolución 2015-2024",
+      "hallazgo": "Las muertes registradas por Medicina Legal pasaron de 6.880 en 2015 a 8.580 en 2023. Las lesiones cayeron 61 % en 2020 por la pandemia y no recuperaron el nivel previo: en 2024 son 32 % menos que en 2015.",
+      "archivo": "reports/figuras/01_evolucion_anual.png"
+    },
+    {
+      "nombre": "02_distribucion_medio",
+      "titulo": "Las víctimas en motocicleta son 60 % de los lesionados y 57 % de los fallecidos",
+      "tipo_grafico": "Gráfico de mariposa (barras enfrentadas) con escala secuencial",
+      "pregunta": "P2/P3: perfil de la víctima y vehículo",
+      "hallazgo": "La motocicleta domina: 60 % de los lesionados y 57 % de los fallecidos. Los peatones pesan más entre los fallecidos (24 %) que entre los lesionados (17 %).",
+      "archivo": "reports/figuras/02_distribucion_medio.png"
+    },
+    {
+      "nombre": "03_distribucion_edad",
+      "titulo": "Los adultos de 20 a 34 años son el 41 % de los lesionados, pero los mayores de 60 pesan 2 veces más entre los fallecidos que entre los lesionados",
+      "tipo_grafico": "Barras verticales agrupadas",
+      "pregunta": "P2: perfil de la víctima",
+      "hallazgo": "El grupo de 20 a 34 años concentra el 41 % de los lesionados. Los mayores de 60 son 10 % de los lesionados pero 21 % de los fallecidos.",
+      "archivo": "reports/figuras/03_distribucion_edad.png"
+    },
+    {
+      "nombre": "04_gravedad_por_edad",
+      "titulo": "El riesgo de morir crece con la edad: a los 80 años o más fallece el 51 % de las víctimas, 3 veces más que entre los 25 y 34 años",
+      "tipo_grafico": "Barras 100 % apiladas (colores cualitativos)",
+      "pregunta": "P2: relación edad-gravedad",
+      "hallazgo": "La proporción de muertes es estable (~16 %) entre los 20 y 49 años y se dispara desde los 60: 23 % a los 60-64 y 51 % a los 80 o más. En niños de 5 a 9 años es solo 8 %.",
+      "archivo": "reports/figuras/04_gravedad_por_edad.png"
+    },
+    {
+      "nombre": "05_letalidad_objeto",
+      "titulo": "Chocar contra un objeto fijo es el evento más letal: muere el 67 % de las víctimas, 3,8 veces el promedio",
+      "tipo_grafico": "Barras horizontales ordenadas con escala secuencial",
+      "pregunta": "P3: vehículos y objetos más letales",
+      "hallazgo": "Objeto fijo (67 %) y sin colisión, es decir volcamientos y caídas (37 %), son los más letales; el promedio es 18 %. Chocar con un vehículo de carga pesada mata al 21 % de las víctimas, frente al 8 % con un automóvil.",
+      "archivo": "reports/figuras/05_letalidad_objeto.png"
+    },
+    {
+      "nombre": "06_causas",
+      "titulo": "Desobedecer señales y normas y exceso de velocidad explican el 79 % de las muertes con causa conocida; en lesionados pesan también las maniobras peligrosas",
+      "tipo_grafico": "Barras horizontales agrupadas",
+      "pregunta": "P4: causas más frecuentes",
+      "hallazgo": "Entre los fallecidos con causa registrada, desobedecer señales y normas (40 %) y exceso de velocidad (40 %) dominan. Entre los lesionados predominan las maniobras peligrosas (26 %) y la imprudencia del peatón (14 %). Las causas de muerte se registran con un catálogo más corto, por lo que la comparación es indicativa.",
+      "archivo": "reports/figuras/06_causas.png"
+    },
+    {
+      "nombre": "07_letalidad_region_zona",
+      "titulo": "Un siniestro en zona rural es entre 3,0 y 4,3 veces más letal que en la cabecera municipal, en todas las regiones",
+      "tipo_grafico": "Mapa de calor (escala viridis)",
+      "pregunta": "P5: dónde son más graves",
+      "hallazgo": "En la cabecera municipal muere entre el 11 % y el 22 % de las víctimas; en zona rural, entre el 48 % y el 65 %. La región más crítica en zona rural es Amazonía (65 %).",
+      "archivo": "reports/figuras/07_letalidad_region_zona.png"
+    },
+    {
+      "nombre": "08_cobertura_fuentes",
+      "titulo": "La Policía registra hasta 1,9 veces más lesionados que Medicina Legal, pero siempre menos muertes: ninguna fuente sola dimensiona el problema",
+      "tipo_grafico": "Líneas con línea de referencia",
+      "pregunta": "P6: cobertura entre fuentes",
+      "hallazgo": "En muertes la razón está entre 0,77 y 0,94: no toda muerte llega a denuncia. En lesiones va de 0,93 a 1,90: muchos lesionados denuncian sin pasar por examen forense.",
+      "archivo": "reports/figuras/08_cobertura_fuentes.png"
+    },
+    {
+      "nombre": "09_matriz_confusion",
+      "titulo": "El modelo identifica correctamente el 70 % de las muertes; la mayor confusión está entre lesión leve y lesión grave",
+      "tipo_grafico": "Matriz de confusión (mapa de calor, escala viridis)",
+      "pregunta": "Modelo: evaluación",
+      "hallazgo": "De cada 100 muertes reales, el modelo detecta 70. Acierta el 48 % de las lesiones leves y el 43 % de las graves: separar leve de grave es lo más difícil, porque depende de días de incapacidad que no se conocen al momento del hecho.",
+      "archivo": "reports/figuras/09_matriz_confusion.png"
+    },
+    {
+      "nombre": "10_importancia_variables",
+      "titulo": "El medio de transporte y el objeto de colisión son los factores que más pesan en la gravedad, seguidos de la clase de accidente y la zona",
+      "tipo_grafico": "Barras horizontales ordenadas con escala secuencial",
+      "pregunta": "Modelo: interpretación",
+      "hallazgo": "La variable más importante es medio de transporte: al desordenarla, el F1 macro cae 0,077. Las variables del vehículo y del tipo de accidente pesan más que las del calendario (mes, fin de semana).",
+      "archivo": "reports/figuras/10_importancia_variables.png"
+    },
+    {
+      "nombre": "11_perfiles_riesgo",
+      "titulo": "Zona rural, objeto fijo y edad de 80+ multiplican por más de 3 la probabilidad de morir frente al perfil base",
+      "tipo_grafico": "Barras horizontales con perfil de referencia",
+      "pregunta": "Modelo: interpretación para el negocio",
+      "hallazgo": "Para un motociclista de 25-29 años que choca con un automóvil en la ciudad, la probabilidad estimada de morir es 15 %. El factor que más la eleva es 'si la víctima tiene 80 años o más' (×3,8); ser mujer la reduce a la mitad.",
+      "archivo": "reports/figuras/11_perfiles_riesgo.png"
+    }
+  ],
+  "recomendaciones": [
+    {
+      "id": 1,
+      "tema": "Zona y región",
+      "prioridad": "Alta",
+      "insights_relacionados": [
+        3,
+        4
+      ],
+      "recomendacion": "Priorizar control de velocidad, señalización y atención prehospitalaria en vías rurales y centros poblados, con ambulancias ubicadas según los tramos de mayor letalidad.",
+      "sustento": "Zona rural ×3,7 y objeto fijo ×3,3 en la probabilidad de muerte."
+    },
+    {
+      "id": 2,
+      "tema": "Medio de transporte",
+      "prioridad": "Alta",
+      "insights_relacionados": [
+        2,
+        6
+      ],
+      "recomendacion": "Programas de seguridad para motociclistas: formación práctica para la licencia, control de velocidad y uso de casco certificado, enfocados en los departamentos con más víctimas.",
+      "sustento": "La motocicleta concentra el 56 % de las muertes y el 58 % de las lesiones"
+    },
+    {
+      "id": 3,
+      "tema": "Perfil de la víctima",
+      "prioridad": "Alta",
+      "insights_relacionados": [
+        2,
+        5
+      ],
+      "recomendacion": "Proteger al peatón adulto mayor: cruces seguros, tiempos de semáforo más largos y reducción de velocidad cerca de hospitales, plazas de mercado y centros de salud.",
+      "sustento": "Las víctimas de 60 años o más mueren en el 31 % de los casos, frente al 17 % del resto"
+    },
+    {
+      "id": 4,
+      "tema": "Infraestructura",
+      "prioridad": "Media",
+      "insights_relacionados": [
+        4
+      ],
+      "recomendacion": "Instalar barreras de contención y despejar o proteger postes y árboles al borde de la vía en los corredores con choques contra objetos fijos.",
+      "sustento": "Chocar contra un objeto fijo es mortal en el 68 % de los casos"
+    },
+    {
+      "id": 5,
+      "tema": "Calidad de las fuentes",
+      "prioridad": "Media",
+      "insights_relacionados": [
+        6,
+        7
+      ],
+      "recomendacion": "Que el INMLCF y la Policía registren obligatoriamente la hora y la causa del siniestro, y compartan un identificador común del caso para cruzar las fuentes.",
+      "sustento": "Ninguna fuente por sí sola dimensiona el fenómeno: no toda muerte llega a denuncia penal y no todo lesionado pasa por examen forense. Además, la hora y la causa faltan en la mitad o más de las muertes del INMLCF."
+    },
+    {
+      "id": 6,
+      "tema": "Modelo",
+      "prioridad": "Media",
+      "insights_relacionados": [
+        8
+      ],
+      "recomendacion": "Usar el modelo como alerta temprana para priorizar recursos (no para decidir casos individuales) y reentrenarlo cada año con los datos nuevos.",
+      "sustento": "El modelo detecta 70 de cada 100 muertes y supera la línea base en 17 puntos de F1 macro"
+    }
+  ]
+}
