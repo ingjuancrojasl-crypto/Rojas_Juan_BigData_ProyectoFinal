@@ -107,8 +107,10 @@ Para repetir todo desde cero: `FORZAR_PIPELINE=1` en el `.env` (o borrar `data/p
 | Servicio | URL | Credenciales |
 |---|---|---|
 | Dashboard (app) | http://localhost:8501 | — |
-| Jupyter Lab (procesamiento) | http://localhost:8888/?token=TOKEN | `JUPYTER_TOKEN` del `.env` |
+| Jupyter Lab (procesamiento) | http://localhost:8888/?token=siniestros | Token = valor de `JUPYTER_TOKEN` en el `.env`; si esa variable no está, el token es **`siniestros`** |
 | MongoDB | `mongodb://localhost:27017` (Compass) | `MONGO_USER` / `MONGO_PASSWORD` del `.env` |
+
+**Token de Jupyter:** si Jupyter pide *Password or token*, escriba el valor de `JUPYTER_TOKEN` de su `.env` (con el `.env.example` sin cambios es `cambie_este_token`); si el `.env` no define esa variable, el token es `siniestros`. MongoDB (puerto 27017) no se abre en el navegador: se consulta con MongoDB Compass o con el notebook.
 
 Dentro de la red de Docker los servicios se comunican por nombre (`mongodb:27017`), no por `localhost`.
 
