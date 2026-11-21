@@ -5,7 +5,7 @@
 
 **Dashboard en línea:** https://siniestros-colombia-jrojas.streamlit.app/ (Streamlit Community Cloud; los insights se muestran desde la copia exportada del documento de MongoDB)
 
-**Video de sustentación:** _[pendiente: pegar aquí el enlace no listado]_
+**Video de sustentación:** https://www.youtube.com/watch?v=9MHYmnWg5Ds
 
 ---
 
