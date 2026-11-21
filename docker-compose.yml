@@ -1,24 +1,27 @@
-# Pipeline de siniestros de transporte: procesamiento (Jupyter), MongoDB y app (Streamlit).
-# Uso:  cp .env.example .env   &&   docker compose up --build
+# Siniestros de transporte en Colombia: toda la solución con un solo comando.
+#   1) copiar .env.example como .env y cambiar las claves
+#   2) docker compose up --build
+# Servicios: mongodb (persistencia) -> procesamiento (pipeline + Jupyter) -> app (Streamlit)
 name: siniestros-transporte
 
 services:
   mongodb:
-    image: mongo:7.0
+    image: mongo:7.0                       # versión fija (no "latest") para que todos usen la misma
     container_name: siniestros-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:?Defina MONGO_USER en el archivo .env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?Defina MONGO_PASSWORD en el archivo .env}
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      - "${MONGO_PORT:-27017}:27017"       # si el puerto está ocupado, cambie MONGO_PORT en el .env
     volumes:
-      - mongo_datos:/data/db
+      - mongo_datos:/data/db               # volumen con nombre: los datos sobreviven a docker compose down
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 20s
 
   procesamiento:
     build:
@@ -27,15 +30,23 @@ services:
     container_name: siniestros-procesamiento
     env_file: .env
     environment:
-      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/
+      # Dentro de la red de Docker, MongoDB se llama "mongodb" (no localhost)
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin
     ports:
       - "${JUPYTER_PORT:-8888}:8888"
     volumes:
-      - ./:/proyecto            # código, notebook, data/, models/ y reports/ compartidos con el host
+      - ./:/proyecto                       # código, data/, models/ y reports/ compartidos con el equipo
     depends_on:
       mongodb:
         condition: service_healthy
-    mem_limit: 4g
+    mem_limit: 5g                          # el ETL llega a ~2,2 GB y el modelado a ~3 GB
+    healthcheck:
+      # "healthy" solo cuando el pipeline terminó (src/pipeline_docker.py crea la marca)
+      test: ["CMD", "test", "-f", "/tmp/pipeline_listo"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 40m                    # tiempo máximo para la primera ejecución completa
 
   app:
     build:
@@ -44,14 +55,22 @@ services:
     container_name: siniestros-app
     env_file: .env
     environment:
-      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/
+      MONGO_URI: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongodb:27017/?authSource=admin
     ports:
       - "${STREAMLIT_PORT:-8501}:8501"
     volumes:
-      - ./:/proyecto:ro         # la app solo lee resultados (Parquet, modelo, PDF)
+      - ./:/proyecto:ro                    # la app solo LEE resultados (Parquet, modelo, MongoDB, PDF)
     depends_on:
       mongodb:
         condition: service_healthy
+      procesamiento:
+        condition: service_healthy         # arranca cuando los resultados están listos
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health')"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   mongo_datos:

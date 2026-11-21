@@ -1,0 +1,11 @@
+# Lo que NO se envía al "build context" de Docker (las imágenes solo copian requirements y el entrypoint;
+# el proyecto se monta como volumen al ejecutar). Sin esto, Docker enviaba ~500 MB de datos en cada build.
+.git
+.env
+data/
+models/
+reports/
+*.zip
+**/__pycache__
+**/.ipynb_checkpoints
+.venv
