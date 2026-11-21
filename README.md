@@ -3,6 +3,8 @@
 
 **Proyecto final — Gerencia y almacenamiento en Big Data** · Autor: **Juan Rojas** · Modalidad individual
 
+**Dashboard en línea:** https://siniestros-colombia-jrojas.streamlit.app/ (Streamlit Community Cloud; los insights se muestran desde la copia exportada del documento de MongoDB)
+
 **Video de sustentación:** _[pendiente: pegar aquí el enlace no listado]_
 
 ---
@@ -28,14 +30,14 @@ Tras filtrar tránsito y el periodo común **2015-2024**: **767.313 registros**,
 
 ```
                  ┌─────────────────────────────── red interna de Docker ───────────────────────────────┐
-  GitHub (.zip) ►│  procesamiento (Jupyter + pandas)  ──insights──►  mongodb (mongo:7.0)               │
-  (o datos.gov.co│      │  descarga → ETL → modelo → PDF                    ▲                           │
+  GitHub (.zip) ►│  procesamiento (Jupyter + pandas)  ──documento──►  mongodb (mongo:7.0)              │
+  (o datos.gov.co│      │  descarga → ETL → gráficas → modelo → PDF        ▲                           │
    como respaldo)│      ▼                                                    │ lee insights              │
                  │  volumen ./data  ./models  ./reports  ───── lee ────►  app (Streamlit)               │
                  └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **procesamiento:** descarga las 4 fuentes desde los .zip del repositorio en GitHub (con datos.gov.co como respaldo), ejecuta el ETL y deja Jupyter Lab listo para correr el notebook.
+- **procesamiento:** ejecuta `src/pipeline_docker.py`. En un clon nuevo corre el **notebook completo sin intervención** (descarga desde GitHub con datos.gov.co como respaldo → ETL → gráficas → modelo → MongoDB → PDF); si los resultados ya existen, solo guarda el documento en MongoDB y regenera el PDF. Después deja Jupyter Lab abierto.
 - **mongodb:** almacena el documento de análisis (metadata, calidad, estadísticas, modelo, insights, recomendaciones). Persistencia en el volumen `mongo_datos`.
 - **app:** dashboard Streamlit que **solo lee** resultados ya procesados (Parquet, modelo, MongoDB y PDF).
 
@@ -58,9 +60,15 @@ Rojas_Juan_BigData_ProyectoFinal/
 │   ├── config.py             # Rutas relativas, fuentes y parámetros
 │   ├── descargar_datos.py    # Descarga de las 4 fuentes (GitHub, con datos.gov.co como respaldo)
 │   ├── etl.py                # Diagnóstico de calidad, unificación y 4 técnicas ETL
-│   └── visualizaciones.py    # Gráficas del análisis exploratorio (principios de la Actividad 7)
+│   ├── visualizaciones.py    # Gráficas del análisis exploratorio y del modelo
+│   ├── modelo.py             # Preparación, entrenamiento, evaluación y guardado del modelo
+│   ├── mongo_analisis.py     # Documento de análisis en MongoDB (sección 6)
+│   ├── reporte_pdf.py        # Reporte PDF automático con ReportLab (sección 7)
+│   └── pipeline_docker.py    # Orquestación del servicio de procesamiento en Docker
 ├── *.zip                     # 4 CSV originales comprimidos (fuente de descarga del proyecto)
-├── processing/               # Dockerfile y requirements del servicio Jupyter
+├── processing/               # Dockerfile, requirements y entrypoint del servicio de procesamiento
+├── .streamlit/config.toml    # Tema azul del dashboard
+├── .dockerignore             # Excluye datos y modelos del build de Docker
 ├── models/                   # Modelo entrenado
 ├── reports/                  # Reporte PDF y figuras/ (gráficas PNG + registro visualizaciones.json)
 └── app/
@@ -71,7 +79,8 @@ Rojas_Juan_BigData_ProyectoFinal/
 ## 4. Requisitos
 
 - Docker Desktop (o Docker Engine) con **Docker Compose v2**.
-- ~4 GB de RAM libres para el contenedor de procesamiento y ~2 GB de disco.
+- ~5 GB de RAM asignados a Docker (el procesamiento llega a ~3 GB) y ~3 GB de disco.
+- Puertos libres: 8888, 8501 y 27017 (se pueden cambiar en el `.env`).
 - Conexión a internet la primera vez (imágenes de Docker y ~26 MB de datos comprimidos).
 
 ## 5. Cómo ejecutar
@@ -84,24 +93,39 @@ docker compose up --build
 ```
 
 ### Orden de ejecución
-1. **mongodb** arranca y espera a estar sano (`healthcheck` con `ping`).
-2. **procesamiento** descarga las 4 fuentes desde GitHub a `data/raw/` (si faltan), ejecuta el ETL (si no existen los Parquet) y abre Jupyter Lab.
-3. **app** arranca Streamlit y lee los resultados.
+1. **mongodb** arranca con el usuario y la clave del `.env` y pasa a `healthy` cuando responde a `ping`.
+2. **procesamiento** espera a MongoDB y ejecuta `src/pipeline_docker.py`:
+   - **primera vez** (sin Parquet ni modelo): ejecuta el notebook completo — descarga (~26 MB), ETL, 11 gráficas, modelo, documento en MongoDB y PDF. Tarda unos **5-10 minutos**; la copia ejecutada queda en `reports/notebook_ejecutado_docker.ipynb`;
+   - **siguientes veces**: no repite el ETL ni el entrenamiento; solo guarda el documento en MongoDB y regenera el PDF (segundos).
+   Al terminar pasa a `healthy` y deja Jupyter Lab abierto.
+3. **app** espera a que procesamiento esté `healthy` y arranca Streamlit.
+
+Para repetir todo desde cero: `FORZAR_PIPELINE=1` en el `.env` (o borrar `data/processed/`).
 
 ### Puertos
 
-| Servicio | URL | Notas |
+| Servicio | URL | Credenciales |
 |---|---|---|
-| Jupyter Lab | http://localhost:8888 | Token = `JUPYTER_TOKEN` del `.env` |
-| Dashboard | http://localhost:8501 | |
-| MongoDB | `localhost:27017` | Usuario y clave del `.env` |
+| Dashboard (app) | http://localhost:8501 | — |
+| Jupyter Lab (procesamiento) | http://localhost:8888/?token=TOKEN | `JUPYTER_TOKEN` del `.env` |
+| MongoDB | `mongodb://localhost:27017` (Compass) | `MONGO_USER` / `MONGO_PASSWORD` del `.env` |
+
+Dentro de la red de Docker los servicios se comunican por nombre (`mongodb:27017`), no por `localhost`.
+
+### Volúmenes
+| Volumen | Uso |
+|---|---|
+| `mongo_datos` (con nombre) | Persistencia de MongoDB: el documento sobrevive a `docker compose down` |
+| `./` → `/proyecto` (procesamiento, lectura y escritura) | Código, `data/`, `models/` y `reports/` compartidos con el equipo |
+| `./` → `/proyecto:ro` (app, solo lectura) | La app solo lee resultados |
 
 ### Cómo verificar que todo funciona
-1. `docker compose ps` muestra los tres servicios en `running` y mongodb como `healthy`.
-2. `docker compose logs procesamiento` termina con `ETL terminado` y la URL de Jupyter.
-3. Existen `data/processed/siniestros_unificado.parquet` y `data/processed/victimas_medicina_legal.parquet`.
-4. En http://localhost:8501 aparecen las 5 pestañas del dashboard con 960.623 víctimas (4 fuentes) y, en la barra lateral, "Documento de análisis: MongoDB ✅".
-5. En Jupyter, abrir `notebooks/Rojas_Juan_BigData_ProyectoFinal.ipynb` y ejecutar **Kernel → Restart & Run All** sin errores.
+1. `docker compose ps` muestra los tres servicios `Up` y los tres `(healthy)`.
+2. `docker compose logs procesamiento` muestra `PIPELINE LISTO` y la URL de Jupyter.
+3. Existen `data/processed/siniestros_unificado.parquet`, `models/modelo_gravedad.joblib` y `reports/Rojas_Juan_Reporte_Siniestros.pdf`.
+4. En http://localhost:8501 aparecen las 5 pestañas con 960.623 víctimas y, en la barra lateral, **"Documento de análisis: MongoDB ✅"**; en *Insights y reporte*, el botón descarga el PDF.
+5. En MongoDB Compass (`mongodb://USUARIO:CLAVE@localhost:27017/?authSource=admin`) existe la base `siniestros_transporte` con la colección `analisis`.
+6. Para detener: `docker compose down` (conserva los datos de MongoDB); `docker compose down -v` también borra el volumen.
 
 ### Ejecutar sin Docker (opcional)
 ```bash
@@ -121,6 +145,8 @@ streamlit run app/app.py           # abre http://localhost:8501
 | 📈 Visualizaciones | 7 gráficas interactivas (Plotly) con filtros de año, región y medio de transporte |
 | 🤖 Modelo | Métricas, comparación con las líneas base, matriz de confusión, importancia y simulador de predicción |
 | 💡 Insights y reporte | Insights y recomendaciones leídos desde MongoDB (filtro por tema y prioridad) y descarga del PDF |
+
+**Versión en línea:** https://siniestros-colombia-jrojas.streamlit.app/ — desplegada desde este repositorio (archivo principal `app/app.py`, Python 3.11). Como en la nube no hay acceso al MongoDB local, la pestaña *Insights y reporte* usa `reports/documento_mongodb.json`, la copia exportada del mismo documento, y lo indica en pantalla. Cada cambio subido a GitHub actualiza la app.
 
 La app **no repite el ETL ni reentrena**: lee los Parquet de `data/processed/`, el modelo de `models/` y el documento de MongoDB (si MongoDB no responde, muestra la copia `reports/documento_mongodb.json` y lo avisa).
 
@@ -146,7 +172,17 @@ La app **no repite el ETL ni reentrena**: lee los Parquet de `data/processed/`, 
 - **Diagnóstico:** el comando `ping` responde aunque no haya usuario; el archivo `.env` no existía, así que la URI se armaba sin credenciales (`mongodb://localhost:27017/`) y el servidor rechazaba toda escritura.
 - **Solución:** crear `.env` en la raíz con `MONGO_USER`/`MONGO_PASSWORD` (desde PowerShell con `Set-Content` para evitar el `.env.txt` del Bloc de notas), reiniciar el kernel y validar la autenticación al conectar (`list_collection_names()`), que ahora muestra un mensaje claro con la ruta esperada del `.env`.
 
-### 6.5 Límite de 25 MB por archivo en la carga web de GitHub
+### 6.5 Conflicto del puerto 27017 con otro contenedor de MongoDB
+- **Síntoma:** `docker compose up` falla con `Bind for 0.0.0.0:27017 failed: port is already allocated`.
+- **Diagnóstico:** `docker ps` mostró el contenedor `mongodb` de una actividad anterior (imagen `mongo:latest`) publicado en `27017:27017`; dos contenedores no pueden publicar el mismo puerto del equipo.
+- **Solución:** detener el otro contenedor (`docker stop mongodb`) o cambiar `MONGO_PORT` en el `.env` (por ejemplo `27018`). El puerto interno no cambia: los servicios usan `mongodb:27017` dentro de la red de Docker. Además, el proyecto fija `mongo:7.0` en lugar de `latest` para que todos usen la misma versión.
+
+### 6.6 El build de Docker enviaba ~500 MB de datos
+- **Síntoma:** `docker compose up --build` tardaba en "transferring context" antes de empezar a construir.
+- **Diagnóstico:** el *build context* es la carpeta del proyecto; Docker enviaba `data/raw/` (~470 MB), los .zip y los modelos aunque los Dockerfile solo copian `requirements.txt` y el `entrypoint.sh`.
+- **Solución:** `.dockerignore` excluye `data/`, `models/`, `reports/`, `*.zip`, `.env` y cachés; el proyecto se monta como volumen al ejecutar.
+
+### 6.7 Límite de 25 MB por archivo en la carga web de GitHub
 - **Síntoma:** los CSV originales (hasta 238 MB) no se pueden subir al repositorio.
 - **Solución:** cada fuente se comprime por separado en un .zip en la raíz del repositorio (entre 0,9 y 12 MB cada uno) y `data/raw/` queda fuera del control de versiones (`.gitignore`).
 
@@ -162,4 +198,4 @@ La app **no repite el ETL ni reentrena**: lee los Parquet de `data/processed/`, 
 | 6. Insights en MongoDB | ✅ |
 | 7. Reporte PDF | ✅ |
 | 8. Dashboard Streamlit (5 secciones) | ✅ |
-| 9. Docker | ✅ estructura base |
+| 9. Docker Compose (3 servicios, un solo comando) | ✅ |
